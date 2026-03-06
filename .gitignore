@@ -1,0 +1,53 @@
+# ===================
+# Python
+# ===================
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ===================
+# Go
+# ===================
+# Compiled binaries
+Backend_Go/scanner
+Backend_Go/cmd/scanner/scanner
+Backend_Go/*.exe
+Backend_Go/*.out
+
+# ===================
+# Reports (generated output)
+# ===================
+reports/
+GUI/report.html
+GUI/report.json
+GUI/report.pdf
+
+# ===================
+# Logs
+# ===================
+*.log
+Backend/logs/
+
+# ===================
+# OS / Editor
+# ===================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===================
+# Sensitive / Environment
+# ===================
+.env
+*.env
+config.local.*
