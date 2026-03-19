@@ -1,5 +1,20 @@
 package plugin
 
+// ─── MisconfigScanner — Dangerous HTTP Methods (A02:2025) ────────────────────
+//
+// Receives: URLInfo (one URL per call)
+// Does:     1 OPTIONS request → reads the Allow response header
+// Returns:  []Finding  (one per dangerous method found, 0–3 total)
+//
+// Methods checked: TRACE, PUT, DELETE
+//   TRACE  — enables Cross-Site Tracing (XST) attacks.
+//   PUT    — may allow arbitrary file upload to the server.
+//   DELETE — may allow resource deletion without proper auth checks.
+//
+// OWASP: A02:2025 Security Misconfiguration | CWE-650
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"strings"
@@ -49,6 +64,7 @@ func (m *MisconfigScanner) Scan(ctx context.Context, u model.URLInfo) []model.Fi
 				standards.A02URL,
 			)
 			f.ID = buildID("MIS", u.URL, idx)
+			f.CWEIDs = []string{"CWE-16"}
 			findings = append(findings, f)
 		}
 	}

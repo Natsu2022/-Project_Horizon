@@ -1,5 +1,30 @@
 package plugin
 
+// ─── XSSScanner — Reflected XSS Detection (A05:2025) ─────────────────────────
+//
+// Receives: URLInfo — only processes URLs that have query parameters.
+//           URLs without query params are skipped immediately (return nil).
+// Does:     Nonce-based reflection probing per query parameter.
+// Returns:  []Finding  (one per vulnerable parameter, max one payload tested)
+//
+// Algorithm for each query parameter:
+//   1. Generate a random 8-char hex nonce (shared for the entire Scan call).
+//   2. Try each of 4 payload templates (in order):
+//        html_body : <script>/*NONCE*/</script>
+//        html_attr : "><img src=x onerror=/*NONCE*/>
+//        js_context: ';/*NONCE*/
+//        reflection: va-NONCE-probe    (plain string, catches text reflection)
+//   3. Replace %NONCE% placeholder → send GET request with payload as param value.
+//   4. If the nonce string appears anywhere in the response body → reflected XSS.
+//   5. Stop testing further payloads for this parameter (break).
+//
+// Why nonces? A random nonce ensures that each test is unique and cannot be
+// confused with existing page content — avoids false positives.
+//
+// OWASP: A05:2025 Injection | CWE-79
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"crypto/rand"
@@ -93,6 +118,7 @@ func (x *XSSScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 					standards.A05URL+" | "+standards.XSSCommunityURL,
 				)
 				f.ID = buildID("XSS", u.URL, idx)
+				f.CWEIDs = []string{"CWE-79"}
 				findings = append(findings, f)
 				idx++
 				break // confirmed for this parameter; skip remaining payloads

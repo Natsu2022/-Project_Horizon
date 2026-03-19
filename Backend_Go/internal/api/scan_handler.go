@@ -1,30 +1,49 @@
 package api
 
+// ─── POST /scan — HTTP Request Handler ───────────────────────────────────────
+//
+// Receives: POST /scan with JSON body (model.ScanRequest)
+// Returns:  JSON (model.ScanResponse)
+//
+// Responsibilities:
+//   1. Parse and validate JSON body — reject bad input with 400.
+//   2. Normalise target URL (add scheme if missing).
+//   3. Clamp parameters to safe ranges:
+//        MaxPages       → 1–200    (default 30)
+//        MaxDepth       → 1–4      (default 2)
+//        RequestDelayMs → 0–500 ms (default 0)
+//   4. Handle TimedMode — disables page/depth limits and applies a
+//        context timeout of TimeLimitSecs (max 3600 s, default 300 s).
+//   5. Build ScannerEngine and call Run(ctx).
+//   6. Return ScanResponse as JSON 200.
+//
+// Called by: main.go route registration  → POST /scan
+// Delegates to: engine.NewEngine(req).Run(scanCtx)
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
-	"encoding/json"
+	"context"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
 
 	"vuln_assessment_app/internal/engine"
 	"vuln_assessment_app/internal/httpclient"
 	"vuln_assessment_app/internal/model"
 )
 
-func ScanHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
+func ScanHandler(c *gin.Context) {
 	var req model.ScanRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid JSON body", http.StatusBadRequest)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON body"})
 		return
 	}
 
 	req.Target = strings.TrimSpace(req.Target)
 	if req.Target == "" {
-		http.Error(w, "target is required", http.StatusBadRequest)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "target is required"})
 		return
 	}
 	req.Target = httpclient.EnsureURLScheme(req.Target)
@@ -55,12 +74,28 @@ func ScanHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Options == (model.ModuleOptions{}) {
-		req.Options = model.ModuleOptions{Headers: true, Misconfig: true, TLS: true, XSS: true, SQLi: true, CVE: true}
+		req.Options = model.ModuleOptions{Headers: true, Misconfig: true, TLS: true, XSS: true, SQLi: true, CVE: true, BAC: true}
+	}
+
+	var scanCtx context.Context
+	if req.TimedMode {
+		req.MaxPages = 999999
+		req.MaxDepth = 99
+		if req.TimeLimitSecs <= 0 {
+			req.TimeLimitSecs = 300
+		}
+		if req.TimeLimitSecs > 3600 {
+			req.TimeLimitSecs = 3600
+		}
+		var cancel context.CancelFunc
+		scanCtx, cancel = context.WithTimeout(c.Request.Context(), time.Duration(req.TimeLimitSecs)*time.Second)
+		defer cancel()
+	} else {
+		scanCtx = c.Request.Context()
 	}
 
 	scanner := engine.NewEngine(req)
-	result := scanner.Run(r.Context())
+	result := scanner.Run(scanCtx)
 
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
+	c.JSON(http.StatusOK, result)
 }

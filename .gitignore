@@ -20,6 +20,12 @@ Backend_Go/scanner
 Backend_Go/cmd/scanner/scanner
 Backend_Go/*.exe
 Backend_Go/*.out
+.va-server
+
+# ===================
+# Claude Code (personal dev tool config — not project source)
+# ===================
+.claude/
 
 # ===================
 # Reports (generated output)

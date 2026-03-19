@@ -1,5 +1,27 @@
 package crawler
 
+// ─── BFS Web Crawler ──────────────────────────────────────────────────────────
+//
+// Receives: Crawler{StartURL, MaxPages, MaxDepth}
+// Returns:  []model.URLInfo  (URL + depth for every page discovered)
+//
+// Algorithm: Breadth-First Search (BFS) over the target site.
+//   1. Enqueue StartURL at depth 0.
+//   2. Dequeue next node, fetch its HTML, extract all href= links via regex.
+//   3. Skip external links (different hostname), fragments, mailto:, javascript:.
+//   4. Normalise URLs (strip #fragments, session/token query params).
+//   5. Enqueue unvisited same-host links at depth+1.
+//   6. Stop when MaxPages results are collected or MaxDepth is exceeded.
+//
+// Output goes to: engine.ScannerEngine, which passes each URLInfo to all
+// enabled plugins for vulnerability scanning.
+//
+// Known limitation:
+//   JavaScript is NOT executed — SPA sites (React/Vue/Angular) that render
+//   content client-side will return only the root URL (scanned_urls=1).
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"io"
@@ -89,6 +111,8 @@ func (c *Crawler) RunWithContext(ctx context.Context) []model.URLInfo {
 	return results
 }
 
+// fetchLinks fetches the HTML at rawURL and returns all href= link values found.
+// Skips javascript: and mailto: schemes. Returns nil on HTTP 4xx/5xx.
 func fetchLinks(ctx context.Context, rawURL string) []string {
 	client := httpclient.NewClient()
 	req, err := httpclient.NewRequestCtx(ctx, rawURL)
@@ -145,6 +169,8 @@ func sameHost(start *url.URL, candidate string) bool {
 	return strings.EqualFold(start.Hostname(), u.Hostname())
 }
 
+// normalizeURL strips URL fragments and removes session/token query params
+// to avoid counting the same logical page as multiple distinct URLs.
 func normalizeURL(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil {
