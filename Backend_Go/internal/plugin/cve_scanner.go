@@ -1,5 +1,37 @@
 package plugin
 
+// ─── CVEScanner — Outdated/Vulnerable Software Detection (A03:2025) ──────────
+//
+// Receives: URLInfo (one URL per call)
+// Does:     1 GET request → checks response headers and body meta tag
+// Returns:  []Finding  (one per matched signature)
+//
+// Detection method: signature-based banner matching.
+//   Each cveSignature specifies:
+//     header   — HTTP response header to inspect (empty = check body)
+//     contains — lowercase substring to look for (empty = presence-only check)
+//
+// Headers inspected:
+//   Server, X-Powered-By, X-AspNet-Version, X-Generator,
+//   X-Drupal-Cache, X-WordPress-Cache
+//
+// Body inspection:
+//   <meta name="generator" content="..."> — reveals CMS/framework version.
+//
+// Current signatures (25+) cover:
+//   Apache 2.2/2.4.x (EOL/vulnerable), Nginx 1.14/1.16/1.18 (EOL),
+//   IIS 6.0/7.5 (EOL/legacy), OpenSSL 1.0.x (EOL),
+//   PHP 5.x/7.0–7.3 (EOL), ASP.NET (version disclosure),
+//   Drupal 7/8 (EOL), Joomla 3.x (EOL),
+//   WordPress 4.x/5.0/5.1 (vulnerable), jQuery 1.x (EOL)
+//
+// OWASP: A03:2025 Software Supply Chain Failures | CWE-1104, CWE-1395
+//
+// Limitation: version comparison is substring-only (no semantic versioning).
+// A banner saying "nginx/1.180.0" would match the "nginx/1.18" signature.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"io"
@@ -128,6 +160,7 @@ func (c *CVEScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 				standards.A03URL+" | "+sig.reference,
 			)
 			f.ID = buildID("CVE", u.URL, idx)
+			f.CWEIDs = []string{"CWE-1104", "CWE-1395"}
 			findings = append(findings, f)
 		}
 	}

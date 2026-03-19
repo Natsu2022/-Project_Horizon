@@ -1,5 +1,24 @@
 package plugin
 
+// ─── HeaderScanner — HTTP Security Headers (A02/A06:2025) ────────────────────
+//
+// Receives: URLInfo (one URL per call)
+// Does:     1 GET request → inspects HTTP response headers
+// Returns:  []Finding  (0–7 findings per URL depending on missing headers)
+//
+// Checks performed and their OWASP/CWE mapping:
+//   Header                   | Missing/Weak → OWASP    | CWE
+//   ─────────────────────────────────────────────────────────
+//   X-Frame-Options          | Missing      → A06:2025  | CWE-1021
+//   X-Content-Type-Options   | Missing      → A06:2025  | CWE-693
+//   Content-Security-Policy  | Missing      → A06:2025  | CWE-693
+//   Content-Security-Policy  | unsafe-inline→ A06:2025  | CWE-693, CWE-79
+//   Strict-Transport-Security| Missing*     → A06:2025  | CWE-693   (*HTTPS only)
+//   Referrer-Policy          | Missing      → A06:2025  | CWE-693
+//   Permissions-Policy       | Missing      → A06:2025  | CWE-693
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"log"
@@ -32,108 +51,122 @@ func (h *HeaderScanner) Scan(ctx context.Context, u model.URLInfo) []model.Findi
 	findings := []model.Finding{}
 
 	if resp.Header.Get("X-Frame-Options") == "" {
-		findings = append(findings, model.NewFinding(
+		f := model.NewFinding(
 			"headers",
 			"missing_security_header",
 			"Missing X-Frame-Options",
 			"Response does not contain X-Frame-Options header, increasing clickjacking risk.",
 			"Medium",
-			standards.A02SecurityMisconfiguration,
+			standards.A06InsecureDesign,
 			u.URL,
 			"X-Frame-Options header not found",
 			"Set X-Frame-Options to DENY or SAMEORIGIN.",
-			standards.A02URL,
-		))
+			standards.A06URL,
+		)
+		f.CWEIDs = []string{"CWE-1021"}
+		findings = append(findings, f)
 	}
 
 	if resp.Header.Get("X-Content-Type-Options") == "" {
-		findings = append(findings, model.NewFinding(
+		f := model.NewFinding(
 			"headers",
 			"missing_security_header",
 			"Missing X-Content-Type-Options",
 			"Response does not contain X-Content-Type-Options header.",
 			"Low",
-			standards.A02SecurityMisconfiguration,
+			standards.A06InsecureDesign,
 			u.URL,
 			"X-Content-Type-Options header not found",
 			"Set X-Content-Type-Options to nosniff.",
-			standards.A02URL,
-		))
+			standards.A06URL,
+		)
+		f.CWEIDs = []string{"CWE-693"}
+		findings = append(findings, f)
 	}
 
 	if csp := resp.Header.Get("Content-Security-Policy"); csp == "" {
-		findings = append(findings, model.NewFinding(
+		f := model.NewFinding(
 			"headers",
 			"missing_security_header",
 			"Missing Content-Security-Policy",
 			"Content-Security-Policy header is missing, reducing protection against script injection.",
 			"Medium",
-			standards.A02SecurityMisconfiguration,
+			standards.A06InsecureDesign,
 			u.URL,
 			"Content-Security-Policy header not found",
 			"Define a restrictive Content-Security-Policy for scripts and objects.",
-			standards.A02URL,
-		))
+			standards.A06URL,
+		)
+		f.CWEIDs = []string{"CWE-693"}
+		findings = append(findings, f)
 	} else if strings.Contains(strings.ToLower(csp), "unsafe-inline") {
-		findings = append(findings, model.NewFinding(
+		f := model.NewFinding(
 			"headers",
 			"weak_security_header",
 			"Weak Content-Security-Policy",
 			"Content-Security-Policy contains unsafe-inline which weakens XSS protections.",
 			"Low",
-			standards.A02SecurityMisconfiguration,
+			standards.A06InsecureDesign,
 			u.URL,
 			"CSP contains unsafe-inline",
 			"Avoid unsafe-inline and adopt nonce/hash based CSP.",
-			standards.A02URL,
-		))
+			standards.A06URL,
+		)
+		f.CWEIDs = []string{"CWE-693", "CWE-79"}
+		findings = append(findings, f)
 	}
 
 	if strings.HasPrefix(strings.ToLower(u.URL), "https://") {
 		if resp.Header.Get("Strict-Transport-Security") == "" {
-			findings = append(findings, model.NewFinding(
+			f := model.NewFinding(
 				"headers",
 				"missing_security_header",
 				"Missing Strict-Transport-Security (HSTS)",
 				"Response does not include Strict-Transport-Security header, allowing protocol downgrade attacks.",
 				"High",
-				standards.A02SecurityMisconfiguration,
+				standards.A06InsecureDesign,
 				u.URL,
 				"Strict-Transport-Security header not found",
 				"Add Strict-Transport-Security: max-age=31536000; includeSubDomains; preload",
-				standards.A02URL,
-			))
+				standards.A06URL,
+			)
+			f.CWEIDs = []string{"CWE-693"}
+			findings = append(findings, f)
 		}
 	}
 
 	if resp.Header.Get("Referrer-Policy") == "" {
-		findings = append(findings, model.NewFinding(
+		f := model.NewFinding(
 			"headers",
 			"missing_security_header",
 			"Missing Referrer-Policy",
 			"Referrer-Policy header is absent, potentially leaking URL information to third parties.",
 			"Low",
-			standards.A02SecurityMisconfiguration,
+			standards.A06InsecureDesign,
 			u.URL,
 			"Referrer-Policy header not found",
 			"Set Referrer-Policy to no-referrer or strict-origin-when-cross-origin.",
-			standards.A02URL,
-		))
+			standards.A06URL,
+		)
+		f.CWEIDs = []string{"CWE-693"}
+		findings = append(findings, f)
 	}
 
 	if resp.Header.Get("Permissions-Policy") == "" {
-		findings = append(findings, model.NewFinding(
+		f := model.NewFinding(
 			"headers",
 			"missing_security_header",
 			"Missing Permissions-Policy",
 			"Permissions-Policy header is absent, leaving browser features unrestricted.",
 			"Low",
-			standards.A02SecurityMisconfiguration,
+			standards.A06InsecureDesign,
 			u.URL,
 			"Permissions-Policy header not found",
 			"Set Permissions-Policy to restrict camera, microphone, geolocation, and other browser features.",
-			standards.A02URL,
-		))
+			standards.A06URL,
+		)
+		f.CWEIDs = []string{"CWE-693"}
+		findings = append(findings, f)
 	}
 
 	for i := range findings {

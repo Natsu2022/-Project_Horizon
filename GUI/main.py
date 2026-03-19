@@ -1,3 +1,37 @@
+"""
+main.py — VA Scanner GUI (PyQt6)
+══════════════════════════════════
+Main window for the Vulnerability Assessment Scanner desktop application.
+
+Architecture:
+  ScannerGUI (QWidget)        — main window, builds all UI widgets
+      └─ ScanWorker (QObject) — runs in a background QThread
+             └─ api_client.start_scan_with_session()
+                    └─ POST http://127.0.0.1:5500/scan
+
+UI flow:
+  1. User enters target URL + sets options (module checkboxes, page/depth limits).
+  2. Clicks "Start Scan" → ScannerGUI builds a payload dict, creates ScanWorker,
+     moves it to a QThread, connects signals, starts the thread.
+  3. ScanWorker.run() calls start_scan_with_session() in the background thread.
+     The session object is saved so cancel() can call session.close() to abort.
+  4. On success  → ScanWorker.finished(result_dict) → ScannerGUI displays findings
+     and enables "Open Report" buttons (xdg-open for JSON/HTML/PDF).
+  5. On failure  → ScanWorker.failed(error_str)   → ScannerGUI shows error text.
+  6. On cancel   → ScanWorker.cancelled()         → ScannerGUI resets UI state.
+
+Key widgets (built in ScannerGUI):
+  target_input    — URL line edit
+  max_pages       — QSpinBox 1–200 (default 30)
+  max_depth       — QSpinBox 1–4   (default 2)
+  delay_ms        — QSpinBox 0–500 ms step 50 (default 100)
+  module_checks   — dict of QCheckBox per plugin (headers/misconfig/tls/xss/sqli/cve/bac)
+  format_checks   — dict of QCheckBox per report format (json/html/pdf)
+  scan_btn        — Start / Cancel toggle
+  log_box         — QTextEdit for real-time status messages
+  report_buttons  — dynamically created "Open X" buttons after scan success
+"""
+
 import json
 import os
 import subprocess
@@ -8,6 +42,7 @@ from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal
 from PyQt6.QtGui import QCloseEvent
 from PyQt6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QCheckBox,
     QGridLayout,
     QHBoxLayout,
@@ -15,6 +50,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QProgressBar,
     QPushButton,
+    QRadioButton,
     QSpinBox,
     QTextEdit,
     QVBoxLayout,
@@ -25,6 +61,19 @@ from api_client import health_check, start_scan_with_session
 
 
 class ScanWorker(QObject):
+    """
+    Background worker that calls the VA Scanner backend in a separate QThread.
+
+    Signals:
+      finished(dict)  — emitted with the full ScanResponse JSON dict on success.
+      failed(str)     — emitted with the error message string on exception.
+      cancelled()     — emitted when cancel() was called before the response arrived.
+
+    Cancellation:
+      cancel() sets _cancelled=True and calls session.close(), which immediately
+      aborts the HTTP request. The Go backend detects context cancellation and
+      stops mid-scan. The QThread then exits cleanly.
+    """
     finished = pyqtSignal(dict)
     failed = pyqtSignal(str)
     cancelled = pyqtSignal()
@@ -57,6 +106,22 @@ class ScanWorker(QObject):
 
 
 class ScannerGUI(QWidget):
+    """
+    Main application window for the VA Scanner.
+
+    Layout (top → bottom):
+      _build_dashboard()       — system stats bar (CPU, RAM, scan timer)
+      _build_scan_controls()   — target input, module checkboxes, report format,
+                                 page/depth/delay spinboxes, Start/Cancel button
+      _build_results_area()    — log output box + dynamic report open buttons
+
+    Scan lifecycle managed by:
+      _start_scan()  — validates input, builds ScanWorker, starts QThread.
+      _cancel_scan() — calls ScanWorker.cancel(), waits for thread to finish.
+      _on_finished() — receives result dict, renders stats/findings in log box,
+                       creates "Open Report" buttons for each generated artifact.
+      _on_failed()   — shows error in log box, resets button state.
+    """
     def __init__(self):
         super().__init__()
 
@@ -121,14 +186,37 @@ class ScannerGUI(QWidget):
         root.addWidget(QLabel("Target URL"))
         root.addWidget(self.url_input)
 
+        # Scan mode selector
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Scan Mode:"))
+        self.mode_complete = QRadioButton("Complete (Pages/Depth)")
+        self.mode_complete.setChecked(True)
+        self.mode_timed = QRadioButton("Timed")
+        self.mode_group = QButtonGroup()
+        self.mode_group.addButton(self.mode_complete)
+        self.mode_group.addButton(self.mode_timed)
+        self.mode_complete.toggled.connect(self._toggle_scan_mode)
+        mode_row.addWidget(self.mode_complete)
+        mode_row.addWidget(self.mode_timed)
+        mode_row.addStretch()
+        root.addLayout(mode_row)
+
         scan_cfg = QGridLayout()
+        self.lbl_max_pages = QLabel("Max Pages")
         self.max_pages = QSpinBox()
         self.max_pages.setRange(1, 200)
         self.max_pages.setValue(30)
 
+        self.lbl_max_depth = QLabel("Max Depth")
         self.max_depth = QSpinBox()
         self.max_depth.setRange(1, 4)
         self.max_depth.setValue(2)
+
+        self.lbl_time_limit = QLabel("Time Limit")
+        self.time_limit_mins = QSpinBox()
+        self.time_limit_mins.setRange(1, 120)
+        self.time_limit_mins.setValue(5)
+        self.time_limit_mins.setSuffix(" min")
 
         self.delay_ms = QSpinBox()
         self.delay_ms.setRange(0, 500)
@@ -136,12 +224,19 @@ class ScannerGUI(QWidget):
         self.delay_ms.setValue(100)
         self.delay_ms.setSuffix(" ms")
 
-        scan_cfg.addWidget(QLabel("Max Pages"), 0, 0)
+        scan_cfg.addWidget(self.lbl_max_pages, 0, 0)
         scan_cfg.addWidget(self.max_pages, 0, 1)
-        scan_cfg.addWidget(QLabel("Max Depth"), 0, 2)
+        scan_cfg.addWidget(self.lbl_max_depth, 0, 2)
         scan_cfg.addWidget(self.max_depth, 0, 3)
-        scan_cfg.addWidget(QLabel("Request Delay"), 1, 0)
-        scan_cfg.addWidget(self.delay_ms, 1, 1)
+        scan_cfg.addWidget(self.lbl_time_limit, 1, 0)
+        scan_cfg.addWidget(self.time_limit_mins, 1, 1)
+        scan_cfg.addWidget(QLabel("Request Delay"), 2, 0)
+        scan_cfg.addWidget(self.delay_ms, 2, 1)
+
+        # Initially hide timed-mode widgets
+        self.lbl_time_limit.setVisible(False)
+        self.time_limit_mins.setVisible(False)
+
         root.addLayout(scan_cfg)
 
         module_layout = QGridLayout()
@@ -157,6 +252,8 @@ class ScannerGUI(QWidget):
         self.opt_sqli.setChecked(True)
         self.opt_cve = QCheckBox("CVE Banner")
         self.opt_cve.setChecked(True)
+        self.opt_bac = QCheckBox("Broken Access Control")
+        self.opt_bac.setChecked(True)
 
         module_layout.addWidget(QLabel("Modules"), 0, 0)
         module_layout.addWidget(self.opt_headers, 1, 0)
@@ -165,6 +262,7 @@ class ScannerGUI(QWidget):
         module_layout.addWidget(self.opt_xss, 2, 0)
         module_layout.addWidget(self.opt_sqli, 2, 1)
         module_layout.addWidget(self.opt_cve, 2, 2)
+        module_layout.addWidget(self.opt_bac, 3, 0, 1, 2)
         root.addLayout(module_layout)
 
         zap_layout = QGridLayout()
@@ -206,6 +304,14 @@ class ScannerGUI(QWidget):
         button_row.addWidget(self.cancel_button)
         root.addLayout(button_row)
 
+    def _toggle_scan_mode(self, complete_checked):
+        self.lbl_max_pages.setVisible(complete_checked)
+        self.max_pages.setVisible(complete_checked)
+        self.lbl_max_depth.setVisible(complete_checked)
+        self.max_depth.setVisible(complete_checked)
+        self.lbl_time_limit.setVisible(not complete_checked)
+        self.time_limit_mins.setVisible(not complete_checked)
+
     def _toggle_zap_fields(self, state):
         enabled = state == Qt.CheckState.Checked.value
         self.zap_url.setEnabled(enabled)
@@ -220,6 +326,7 @@ class ScannerGUI(QWidget):
             "sqli": self.opt_sqli.isChecked(),
             "cve": self.opt_cve.isChecked(),
             "zap": self.opt_zap.isChecked(),
+            "bac": self.opt_bac.isChecked(),
         }
 
     def _report_formats(self):
@@ -257,6 +364,7 @@ class ScannerGUI(QWidget):
         self.progress.setFormat("Scanning...")
         self.set_status("Scan started")
 
+        timed = self.mode_timed.isChecked()
         payload = {
             "target": target,
             "options": self._module_options(),
@@ -266,6 +374,8 @@ class ScannerGUI(QWidget):
             "request_delay_ms": self.delay_ms.value(),
             "zap_base_url": self.zap_url.text().strip(),
             "zap_api_key": self.zap_key.text().strip(),
+            "timed_mode": timed,
+            "time_limit_secs": self.time_limit_mins.value() * 60 if timed else 0,
         }
 
         self.scan_thread = QThread()

@@ -1,5 +1,33 @@
 package plugin
 
+// ─── SQLiScanner — SQL Injection Detection (A05:2025) ────────────────────────
+//
+// Receives: URLInfo — only processes URLs that have query parameters.
+//           URLs without query params are skipped immediately (return nil).
+// Does:     3-phase SQL injection detection per query parameter.
+// Returns:  []Finding  (max one per parameter; stops at the first confirmed phase)
+//
+// Phase 1 — Error-Based  (fastest, ~3 HTTP requests per param)
+//   Payloads: ' | '' | ' OR ''='
+//   Detection: response body matches SQL error strings (mysql_fetch, ORA-XXXX, etc.)
+//   If triggered → report "error_based_sqli" and skip phases 2 & 3 for this param.
+//
+// Phase 2 — Boolean-Based Blind  (2×2 HTTP requests per param)
+//   Payload pairs: true condition vs false condition
+//     "1 AND 1=1--"  vs  "1 AND 1=2--"
+//     "1 AND 'a'='a'--"  vs  "1 AND 'a'='b'--"
+//   Detection: response body size differs by >10% (min 50 bytes) between T/F payloads.
+//   If triggered → report "boolean_blind_sqli" and skip phase 3.
+//
+// Phase 3 — Time-Based Blind  (slowest, up to 4×10s per param)
+//   Payloads: SLEEP(3) for MySQL, pg_sleep(3) for PostgreSQL, WAITFOR DELAY for MSSQL.
+//   Detection: response time ≥ baseline + 2000 ms (min threshold 2500 ms).
+//   Most expensive: each payload can take up to 10 seconds.
+//
+// OWASP: A05:2025 Injection | CWE-89
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"io"
@@ -133,6 +161,7 @@ func sqliErrorBased(ctx context.Context, parsed *url.URL, key, baseURL string, i
 				standards.A05URL+" | "+standards.SQLiCommunityURL,
 			)
 			f.ID = buildID("SQL", baseURL, idx)
+			f.CWEIDs = []string{"CWE-89"}
 			return &f
 		}
 	}
@@ -188,6 +217,7 @@ func sqliBooleanBased(ctx context.Context, parsed *url.URL, key, baseURL string,
 				standards.A05URL+" | "+standards.SQLiCommunityURL,
 			)
 			f.ID = buildID("SQL", baseURL, idx)
+			f.CWEIDs = []string{"CWE-89"}
 			return &f
 		}
 	}
@@ -248,6 +278,7 @@ func sqliTimeBased(ctx context.Context, parsed *url.URL, key, baseURL string, id
 				standards.A05URL+" | "+standards.SQLiCommunityURL,
 			)
 			f.ID = buildID("SQL", baseURL, idx)
+			f.CWEIDs = []string{"CWE-89"}
 			return &f
 		}
 	}

@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(gh pr list)",
-      "Bash(go build ./...)"
-    ]
-  }
-}

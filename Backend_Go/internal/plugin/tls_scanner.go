@@ -1,5 +1,32 @@
 package plugin
 
+// ─── TLSScanner — TLS/Certificate Issues (A04/A07:2025) ──────────────────────
+//
+// Receives: URLInfo (HTTPS URLs only — returns nil for HTTP)
+// Does:     Raw TCP dial → TLS handshake → inspect connection state
+// Returns:  []Finding  (0–3 findings per HTTPS URL)
+//
+// Checks performed:
+//   1. TCP connection failure   → Finding (Medium, A07, CWE-295)
+//      Cannot even reach the TLS port — possible network or config issue.
+//
+//   2. TLS handshake failure    → Finding (Medium, A07, CWE-295)
+//      Certificate rejected, wrong hostname, or unsupported cipher.
+//
+//   3. Deprecated TLS version   → Finding (High, A04, CWE-327)
+//      Server negotiated TLS < 1.2 (i.e. TLS 1.0 or 1.1, both deprecated).
+//
+//   4. Expired certificate      → Finding (High, A07, CWE-298)
+//      cert.NotAfter is in the past.
+//
+//   4b. Near-expiry certificate → Finding (Low, A07, CWE-298)
+//      cert.NotAfter is within 30 days.
+//
+// Note: TLS check uses a raw net.Dialer + tls.Client (not http.Client)
+// so it inspects the actual negotiated version and certificate chain directly.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"crypto/tls"
@@ -39,13 +66,14 @@ func (t *TLSScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 			"TLS handshake failed",
 			"Server TLS handshake failed. This can indicate certificate or protocol issues.",
 			"Medium",
-			standards.A04CryptographicFailures,
+			standards.A07AuthFailures,
 			u.URL,
 			err.Error(),
 			"Check certificate chain and TLS configuration.",
-			standards.A04URL,
+			standards.A07URL,
 		)
 		f.ID = buildID("TLS", u.URL, 0)
+		f.CWEIDs = []string{"CWE-295"}
 		return []model.Finding{f}
 	}
 	conn := tls.Client(rawConn, &tls.Config{InsecureSkipVerify: false, ServerName: parsed.Hostname()})
@@ -57,13 +85,14 @@ func (t *TLSScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 			"TLS handshake failed",
 			"Server TLS handshake failed. This can indicate certificate or protocol issues.",
 			"Medium",
-			standards.A04CryptographicFailures,
+			standards.A07AuthFailures,
 			u.URL,
 			err.Error(),
 			"Check certificate chain and TLS configuration.",
-			standards.A04URL,
+			standards.A07URL,
 		)
 		f.ID = buildID("TLS", u.URL, 0)
+		f.CWEIDs = []string{"CWE-295"}
 		return []model.Finding{f}
 	}
 
@@ -84,6 +113,7 @@ func (t *TLSScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 			"https://datatracker.ietf.org/doc/rfc8996/",
 		)
 		f.ID = buildID("TLS", u.URL, len(findings))
+		f.CWEIDs = []string{"CWE-327"}
 		findings = append(findings, f)
 	}
 
@@ -97,13 +127,14 @@ func (t *TLSScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 				"TLS certificate expired",
 				"The server certificate has expired.",
 				"High",
-				standards.A04CryptographicFailures,
+				standards.A07AuthFailures,
 				u.URL,
 				"Certificate NotAfter: "+cert.NotAfter.Format(time.RFC3339),
 				"Renew and deploy a valid certificate immediately.",
-				standards.A04URL,
+				standards.A07URL,
 			)
 			f.ID = buildID("TLS", u.URL, len(findings))
+			f.CWEIDs = []string{"CWE-298"}
 			findings = append(findings, f)
 		} else if daysLeft <= 30 {
 			f := model.NewFinding(
@@ -112,13 +143,14 @@ func (t *TLSScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 				"TLS certificate near expiration",
 				"The certificate is close to expiration and may cause outage or trust warnings soon.",
 				"Low",
-				standards.A02SecurityMisconfiguration,
+				standards.A07AuthFailures,
 				u.URL,
 				fmt.Sprintf("Certificate expires in %d days", daysLeft),
 				"Schedule certificate renewal before expiry.",
-				standards.A02URL,
+				standards.A07URL,
 			)
 			f.ID = buildID("TLS", u.URL, len(findings))
+			f.CWEIDs = []string{"CWE-298"}
 			findings = append(findings, f)
 		}
 	}

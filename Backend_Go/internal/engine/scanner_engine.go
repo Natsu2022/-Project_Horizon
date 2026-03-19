@@ -1,5 +1,35 @@
 package engine
 
+// ─── Scanner Engine — Core Orchestrator ──────────────────────────────────────
+//
+// Receives: model.ScanRequest  (from api.ScanHandler)
+// Returns:  model.ScanResponse (sent back to the GUI as JSON)
+//
+// Execution flow inside Run(ctx):
+//
+//   Step 1 — Crawl
+//     Crawler.RunWithContext(ctx) → []model.URLInfo
+//     Discovers all reachable pages on the target site (BFS, same-host only).
+//
+//   Step 2 — Parallel Scan
+//     For each URLInfo, a goroutine is launched (max workerCount=10 concurrent).
+//     Each goroutine calls every enabled Plugin.Scan(ctx, url) → []Finding.
+//     RequestDelayMs sleep is applied before each goroutine to rate-limit.
+//
+//   Step 3 — Deduplicate
+//     Findings with the same (Type|TargetURL|Evidence) key are discarded.
+//     A mutex protects the shared findings slice.
+//
+//   Step 4 — Sort
+//     Findings sorted by CVSSScore descending (highest severity first).
+//     Ties broken alphabetically by Type.
+//
+//   Step 5 — Report Generation
+//     report.GenerateArtifacts() writes JSON, HTML, and/or PDF files.
+//     Paths returned as []ReportArtifact inside ScanResponse.
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"log"
@@ -22,6 +52,9 @@ type ScannerEngine struct {
 	Plugins []plugin.ScannerPlugin
 }
 
+// NewEngine builds a ScannerEngine with only the plugins enabled by req.Options.
+// Plugin instances are stateless (except ZAPScanner which uses sync.Once),
+// so they can safely be called concurrently by multiple goroutines.
 func NewEngine(req model.ScanRequest) *ScannerEngine {
 	plugins := make([]plugin.ScannerPlugin, 0, 6)
 
@@ -42,6 +75,9 @@ func NewEngine(req model.ScanRequest) *ScannerEngine {
 	}
 	if req.Options.CVE {
 		plugins = append(plugins, &plugin.CVEScanner{})
+	}
+	if req.Options.BAC {
+		plugins = append(plugins, &plugin.BACScanner{})
 	}
 	if req.Options.ZAP {
 		plugins = append(plugins, &plugin.ZAPScanner{
@@ -130,6 +166,8 @@ func (e *ScannerEngine) Run(ctx context.Context) model.ScanResponse {
 	}
 }
 
+// calculateStats counts findings by severity and packages them with the
+// total number of scanned URLs into a ScanStats for the response.
 func calculateStats(scannedURLs int, findings []model.Finding) model.ScanStats {
 	stats := model.ScanStats{ScannedURLs: scannedURLs, TotalFindings: len(findings)}
 	for _, f := range findings {

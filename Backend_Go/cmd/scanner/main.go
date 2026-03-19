@@ -1,20 +1,52 @@
 package main
 
+// ─── VA Scanner — HTTP Server Entry Point ────────────────────────────────────
+//
+// This is the process entry point (main). It bootstraps the Gin HTTP server
+// and registers the two endpoints that the Python GUI communicates with:
+//
+//   POST /scan   → api.ScanHandler
+//                  Accepts a JSON ScanRequest, runs the full scan pipeline,
+//                  and returns a JSON ScanResponse.
+//
+//   GET  /health → inline handler
+//                  Returns {"status":"ok"}. Used by start.sh to wait until
+//                  the backend is ready before launching the GUI.
+//
+// Startup path:
+//   ./start.sh  →  go build  →  ./va-server  →  main()  →  listen :5500
+//
+// Port: 5500 by default. Override with the VA_PORT environment variable.
+// CORS: all origins allowed (necessary for the local Python/PyQt6 GUI).
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
-	"encoding/json"
 	"log"
-	"net/http"
 	"os"
+	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 
 	"vuln_assessment_app/internal/api"
 )
 
+// main initialises the Gin router, registers routes, then blocks on r.Run().
+// All scan logic is in internal/api and downstream packages.
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/scan", api.ScanHandler)
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	r := gin.Default()
+
+	// CORS — allow GUI (localhost) to call the API
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "OPTIONS"},
+		AllowHeaders:     []string{"Content-Type"},
+		MaxAge:           12 * time.Hour,
+	}))
+
+	r.POST("/scan", api.ScanHandler)
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
 	})
 
 	port := os.Getenv("VA_PORT")
@@ -22,22 +54,8 @@ func main() {
 		port = "5500"
 	}
 
-	addr := ":" + port
 	log.Printf("Server running on http://127.0.0.1:%s", port)
-	if err := http.ListenAndServe(addr, corsMiddleware(mux)); err != nil {
+	if err := r.Run(":" + port); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }

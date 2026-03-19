@@ -1,5 +1,31 @@
 package plugin
 
+// ─── ZAPScanner — OWASP ZAP Integration (Multi-category) ─────────────────────
+//
+// Receives: URLInfo (only processes Depth==0; all deeper URLs return nil)
+// Does:     Calls a running OWASP ZAP daemon via its REST API.
+// Returns:  []Finding  (one per ZAP alert instance)
+//
+// Prerequisites:
+//   - OWASP ZAP must be running with API enabled (default: http://localhost:8880)
+//   - ZAPBaseURL and ZAPAPIKey are configured in ScanRequest / GUI settings.
+//
+// Execution sequence (runs exactly ONCE per engine run via sync.Once):
+//   1. Spider scan  — ZAP crawls the target (waits until status="100").
+//   2. Active scan  — ZAP attacks the crawled URLs (waits until status="100").
+//   3. Fetch alerts — retrieves all alerts via /JSON/core/view/alerts/.
+//   4. Convert      — maps each ZAP alert (+ instances) to model.Finding.
+//
+// Alert conversion:
+//   - RiskCode "3"→High, "2"→Medium, "1"→Low; "0"/Informational is skipped.
+//   - OWASP category is inferred from the alert name via keyword matching
+//     (inject/xss → A05, access control/path traversal → A01, tls → A04, etc.)
+//   - Alerts without specific instances produce one finding for the target URL.
+//
+// OWASP: varies by alert (A01/A02/A03/A04/A05/A07 depending on ZAP's findings)
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
 import (
 	"context"
 	"encoding/json"
@@ -261,7 +287,7 @@ func zapOWASPCategory(alertName string) (string, string) {
 		return standards.A07AuthFailures, standards.A07URL
 	case strings.Contains(name, "component") || strings.Contains(name, "library") ||
 		strings.Contains(name, "outdated") || strings.Contains(name, "version"):
-		return standards.A06VulnerableComponents, standards.A06URL
+		return standards.A03SupplyChainFailures, standards.A03URL
 	default:
 		return standards.A02SecurityMisconfiguration, standards.A02URL
 	}
