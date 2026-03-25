@@ -36,7 +36,7 @@ func (m *MisconfigScanner) Scan(ctx context.Context, u model.URLInfo) []model.Fi
 	if err != nil {
 		return nil
 	}
-	resp, err := client.Do(optionsReq)
+	resp, reqDump, respDump, err := httpclient.DoCapture(client, optionsReq)
 	if err != nil {
 		return nil
 	}
@@ -65,6 +65,8 @@ func (m *MisconfigScanner) Scan(ctx context.Context, u model.URLInfo) []model.Fi
 			)
 			f.ID = buildID("MIS", u.URL, idx)
 			f.CWEIDs = []string{"CWE-16"}
+			f.Request = reqDump
+			f.Response = respDump
 			findings = append(findings, f)
 		}
 	}

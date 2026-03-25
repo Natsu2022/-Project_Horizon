@@ -32,17 +32,66 @@ package engine
 
 import (
 	"context"
+	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"vuln_assessment_app/internal/crawler"
+	"vuln_assessment_app/internal/httpclient"
 	"vuln_assessment_app/internal/model"
 	"vuln_assessment_app/internal/plugin"
 	"vuln_assessment_app/internal/report"
 	"vuln_assessment_app/internal/standards"
 )
+
+// ── Progress tracking ─────────────────────────────────────────────────────────
+// A single global progress state updated during Run() and read by GET /progress.
+
+var (
+	progressMu sync.RWMutex
+	curProgress = ScanProgress{Phase: "idle"}
+)
+
+// ScanProgress is the JSON payload returned by GET /progress.
+type ScanProgress struct {
+	Phase   string  `json:"phase"`   // "idle" | "crawling" | "scanning" | "reporting"
+	Done    int     `json:"done"`    // URLs fully processed
+	Total   int     `json:"total"`   // total URLs to scan
+	Percent float64 `json:"percent"` // 0–100
+}
+
+// GetProgress returns a snapshot of the current scan progress (thread-safe).
+func GetProgress() ScanProgress {
+	progressMu.RLock()
+	defer progressMu.RUnlock()
+	return curProgress
+}
+
+func setProgress(phase string, done, total int) {
+	var pct float64
+	switch phase {
+	case "crawling":
+		pct = 5
+	case "scanning":
+		if total > 0 {
+			pct = 10 + float64(done)/float64(total)*85
+		} else {
+			pct = 10
+		}
+	case "reporting":
+		pct = 98
+	default: // "idle"
+		pct = 0
+	}
+	progressMu.Lock()
+	curProgress = ScanProgress{Phase: phase, Done: done, Total: total, Percent: pct}
+	progressMu.Unlock()
+}
 
 // workerCount controls how many URLs are scanned concurrently.
 const workerCount = 10
@@ -68,10 +117,10 @@ func NewEngine(req model.ScanRequest) *ScannerEngine {
 		plugins = append(plugins, &plugin.TLSScanner{})
 	}
 	if req.Options.XSS {
-		plugins = append(plugins, &plugin.XSSScanner{})
+		plugins = append(plugins, &plugin.XSSScanner{FullScan: req.FullScanMode})
 	}
 	if req.Options.SQLi {
-		plugins = append(plugins, &plugin.SQLiScanner{})
+		plugins = append(plugins, &plugin.SQLiScanner{FullScan: req.FullScanMode})
 	}
 	if req.Options.CVE {
 		plugins = append(plugins, &plugin.CVEScanner{})
@@ -90,9 +139,20 @@ func NewEngine(req model.ScanRequest) *ScannerEngine {
 }
 
 func (e *ScannerEngine) Run(ctx context.Context) model.ScanResponse {
+	defer setProgress("idle", 0, 0) // reset progress when Run() returns
+
 	started := time.Now()
 	scanID := started.Format("20060102-150405")
 
+	// ── Auth: perform login and share session cookies with all scanner requests ──
+	if e.Request.Auth.Enabled && e.Request.Auth.LoginURL != "" {
+		jar := performLogin(e.Request.Auth)
+		httpclient.SetSessionJar(jar)
+		log.Println("[Engine] Auth: login complete, session cookies active")
+	}
+	defer httpclient.SetSessionJar(nil) // clear session after scan completes
+
+	setProgress("crawling", 0, 0)
 	c := crawler.Crawler{
 		StartURL: e.Request.Target,
 		MaxPages: e.Request.MaxPages,
@@ -100,12 +160,15 @@ func (e *ScannerEngine) Run(ctx context.Context) model.ScanResponse {
 	}
 	urls := c.RunWithContext(ctx)
 
+	setProgress("scanning", 0, len(urls))
+
 	var (
 		mu       sync.Mutex
 		findings = make([]model.Finding, 0)
 		seen     = map[string]bool{}
 		wg       sync.WaitGroup
 		sem      = make(chan struct{}, workerCount)
+		doneCnt  int64
 	)
 
 	for _, u := range urls {
@@ -121,6 +184,10 @@ func (e *ScannerEngine) Run(ctx context.Context) model.ScanResponse {
 		go func(u model.URLInfo) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			defer func() {
+				n := atomic.AddInt64(&doneCnt, 1)
+				setProgress("scanning", int(n), len(urls))
+			}()
 
 			local := make([]model.Finding, 0)
 			for _, p := range e.Plugins {
@@ -144,6 +211,8 @@ func (e *ScannerEngine) Run(ctx context.Context) model.ScanResponse {
 	}
 	wg.Wait()
 
+	setProgress("reporting", len(urls), len(urls))
+
 	sort.Slice(findings, func(i, j int) bool {
 		if findings[i].CVSSScore == findings[j].CVSSScore {
 			return findings[i].Type < findings[j].Type
@@ -164,6 +233,35 @@ func (e *ScannerEngine) Run(ctx context.Context) model.ScanResponse {
 		Findings:   findings,
 		Reports:    reports,
 	}
+}
+
+// performLogin submits form credentials to auth.LoginURL and returns a cookie jar
+// populated with the resulting session cookies. All subsequent httpclient requests
+// in the scan will carry these cookies automatically via httpclient.SetSessionJar.
+func performLogin(auth model.AuthConfig) http.CookieJar {
+	jar := httpclient.NewCookieJar()
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+		Jar:     jar,
+		Transport: &http.Transport{
+			ForceAttemptHTTP2: false,
+		},
+	}
+
+	form := url.Values{}
+	form.Set(auth.UsernameField, auth.Username)
+	form.Set(auth.PasswordField, auth.Password)
+
+	resp, err := client.PostForm(auth.LoginURL, form)
+	if err != nil {
+		log.Printf("[Engine] Auth: login POST failed: %v", err)
+		return jar
+	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body) // drain body so connection is reusable
+
+	log.Printf("[Engine] Auth: login POST %s → %d", auth.LoginURL, resp.StatusCode)
+	return jar
 }
 
 // calculateStats counts findings by severity and packages them with the

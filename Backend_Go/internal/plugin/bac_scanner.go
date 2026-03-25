@@ -62,15 +62,50 @@ var (
 	htmlCommentRegex = regexp.MustCompile(`(?s)<!--(.*?)-->`)
 )
 
+// sensitiveCommentKeywords — sourced from gitleaks, TruffleHog, OWASP WSTG,
+// and SecLists patterns for detecting secrets in HTML/source comments.
 var sensitiveCommentKeywords = []string{
-	"password", "passwd", "secret", "api_key", "apikey",
-	"token", "private", "credential", "auth", "debug",
+	// Passwords / passphrases
+	"password", "passwd", "pass", "pwd",
+	// Secrets / keys
+	"secret", "api_key", "apikey", "api key", "key", "private_key",
+	"signing_key", "secret_key", "master_key", "encryption_key",
+	// Tokens
+	"token", "access_token", "auth_token", "refresh_token", "client_secret",
+	"bearer", "jwt", "session_token", "sessionid",
+	// Auth / credentials
+	"private", "credential", "credentials", "auth", "authorization",
+	"username", "admin", "root", "oauth",
+	// Cryptography
+	"hash", "salt", "hmac", "rsa", "ssh", "cert", "certificate",
+	// Database / config
+	"database", "db_pass", "db_password", "connection_string", "connection",
+	"config",
+	// Debug / dev markers that often expose sensitive context (from OWASP WSTG)
+	"debug", "fixme", "hack", "todo",
+	// Exposure markers
+	"internal", "confidential", "sensitive", "disabled", "staging",
 }
 
+// redirectParamNames — sourced from PayloadsAllTheThings, SecLists, and
+// OWASP Unvalidated Redirects cheat sheet.
 var redirectParamNames = []string{
+	// Core / most common
 	"url", "redirect", "next", "return", "goto", "redir",
 	"returnurl", "return_url", "callback", "forward", "dest",
 	"destination", "redirect_uri", "redirect_url",
+	// OAuth / SAML / SSO flows
+	"continue", "state", "relaystate", "service",
+	// Path / location variants
+	"target", "path", "location", "uri", "link", "out", "view",
+	// return_to / redirect_to family
+	"return_to", "redirect_to", "next_url", "next_page",
+	// Referer-related
+	"ref", "referer", "referrer", "origin",
+	// Go / back / exit
+	"go", "back", "back_url", "backurl", "exit_url",
+	// Post-action URLs
+	"success_url", "logout_url", "jump", "proceed",
 }
 
 type sensitivePath struct {
@@ -135,7 +170,7 @@ func (b *BACScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 	if err != nil {
 		return nil
 	}
-	resp, err := client.Do(req)
+	resp, reqDump, respDump, err := httpclient.DoCapture(client, req)
 	if err != nil {
 		log.Println("[BACScanner] error:", err)
 		return nil
@@ -249,6 +284,8 @@ func (b *BACScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 
 	for i := range findings {
 		findings[i].ID = buildID("BAC", u.URL, i)
+		findings[i].Request = reqDump
+		findings[i].Response = respDump
 	}
 	return findings
 }
@@ -270,7 +307,7 @@ func (b *BACScanner) checkOpenRedirect(ctx context.Context, rawURL, param string
 	if err != nil {
 		return nil
 	}
-	resp, err := client.Do(req)
+	resp, reqDump, respDump, err := httpclient.DoCapture(client, req)
 	if err != nil {
 		return nil
 	}
@@ -286,6 +323,8 @@ func (b *BACScanner) checkOpenRedirect(ctx context.Context, rawURL, param string
 			"Validate redirect destinations server-side. Use a whitelist of allowed URLs or restrict to relative paths only.",
 			standards.A01URL)
 		f.CWEIDs = []string{"CWE-601"}
+		f.Request = reqDump
+		f.Response = respDump
 		return &f
 	}
 	return nil
@@ -299,7 +338,7 @@ func (b *BACScanner) probePath(ctx context.Context, baseURL string, sp sensitive
 	if err != nil {
 		return nil
 	}
-	resp, err := client.Do(req)
+	resp, reqDump, respDump, err := httpclient.DoCapture(client, req)
 	if err != nil {
 		return nil
 	}
@@ -320,6 +359,8 @@ func (b *BACScanner) probePath(ctx context.Context, baseURL string, sp sensitive
 		cweIDs = append(cweIDs, "CWE-425")
 	}
 	f.CWEIDs = append(cweIDs, "CWE-862")
+	f.Request = reqDump
+	f.Response = respDump
 	return &f
 }
 

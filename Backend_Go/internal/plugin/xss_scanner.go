@@ -5,15 +5,21 @@ package plugin
 // Receives: URLInfo — only processes URLs that have query parameters.
 //           URLs without query params are skipped immediately (return nil).
 // Does:     Nonce-based reflection probing per query parameter.
+//           Templates loaded from payloads/xss_templates.txt via go:embed.
+//           Add new lines to that file to extend coverage without code changes.
 // Returns:  []Finding  (one per vulnerable parameter, max one payload tested)
 //
 // Algorithm for each query parameter:
 //   1. Generate a random 8-char hex nonce (shared for the entire Scan call).
-//   2. Try each of 4 payload templates (in order):
-//        html_body : <script>/*NONCE*/</script>
-//        html_attr : "><img src=x onerror=/*NONCE*/>
-//        js_context: ';/*NONCE*/
-//        reflection: va-NONCE-probe    (plain string, catches text reflection)
+//   2. Try each template from payloads/xss_templates.txt (in order):
+//        html_body        : <script>/*NONCE*/</script>
+//        html_attr        : "><img src=x onerror=/*NONCE*/>
+//        js_context       : ';/*NONCE*/
+//        reflection       : va-NONCE-probe    (plain string)
+//        svg_onload       : "><svg onload=/*NONCE*/>
+//        autofocus_onfocus: <input onfocus=/*NONCE*/ autofocus>
+//        html5_ontoggle   : <details open ontoggle=/*NONCE*/>
+//        mouse_event      : <img src=x onmouseover=/*NONCE*/>
 //   3. Replace %NONCE% placeholder → send GET request with payload as param value.
 //   4. If the nonce string appears anywhere in the response body → reflected XSS.
 //   5. Stop testing further payloads for this parameter (break).
@@ -26,6 +32,7 @@ package plugin
 // ─────────────────────────────────────────────────────────────────────────────
 
 import (
+	_ "embed"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
@@ -44,17 +51,46 @@ type xssPayload struct {
 	severity string
 }
 
-// xssPayloads covers four injection contexts.
+// xssTemplatesRaw is the embedded payload template file.
+// Edit payloads/xss_templates.txt to add new injection contexts — no code change required.
+//
+//go:embed payloads/xss_templates.txt
+var xssTemplatesRaw string
+
+// xssPayloads is parsed from xss_templates.txt at startup.
 // Detection checks whether the nonce appears in the response body,
 // which catches both verbatim and partially-encoded reflections.
-var xssPayloads = []xssPayload{
-	{`<script>/*%NONCE%*/</script>`, "html_body", "High"},
-	{`"><img src=x onerror=/*%NONCE%*/>`, "html_attr", "High"},
-	{`';/*%NONCE%*/`, "js_context", "Medium"},
-	{`va-%NONCE%-probe`, "reflection", "Medium"},
+var xssPayloads = parseXSSPayloads(xssTemplatesRaw)
+
+// parseXSSPayloads reads lines from the embedded template file.
+// Format per line: template|context|severity
+// Lines starting with '#' and blank lines are ignored.
+func parseXSSPayloads(raw string) []xssPayload {
+	var out []xssPayload
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		out = append(out, xssPayload{
+			template: parts[0],
+			context:  parts[1],
+			severity: strings.TrimSpace(parts[2]),
+		})
+	}
+	return out
 }
 
-type XSSScanner struct{}
+type XSSScanner struct {
+	// FullScan disables the early-exit optimisation: instead of stopping at the
+	// first reflected payload per parameter, every payload template is tested and
+	// all distinct injection contexts are reported.
+	FullScan bool
+}
 
 func (x *XSSScanner) Name() string {
 	return "xss"
@@ -96,7 +132,7 @@ func (x *XSSScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 			if err != nil {
 				continue
 			}
-			resp, err := client.Do(req)
+			resp, reqDump, respDump, err := httpclient.DoCapture(client, req)
 			if err != nil {
 				continue
 			}
@@ -119,9 +155,14 @@ func (x *XSSScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 				)
 				f.ID = buildID("XSS", u.URL, idx)
 				f.CWEIDs = []string{"CWE-79"}
+				f.Request = reqDump
+				f.Response = respDump
 				findings = append(findings, f)
 				idx++
-				break // confirmed for this parameter; skip remaining payloads
+				if !x.FullScan {
+					break // Normal/Timed mode: stop at first confirmed payload per parameter
+				}
+				// Full Scan mode: continue testing remaining payloads to find all reflected contexts
 			}
 		}
 	}

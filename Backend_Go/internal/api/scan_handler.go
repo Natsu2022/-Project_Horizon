@@ -78,7 +78,13 @@ func ScanHandler(c *gin.Context) {
 	}
 
 	var scanCtx context.Context
-	if req.TimedMode {
+	if req.FullScanMode {
+		// Full Scan: no page/depth ceiling, no time limit.
+		// The crawler terminates naturally when BFS exhausts all reachable URLs on the host.
+		req.MaxPages = 999_999
+		req.MaxDepth = 99
+		scanCtx = c.Request.Context()
+	} else if req.TimedMode {
 		req.MaxPages = 999999
 		req.MaxDepth = 99
 		if req.TimeLimitSecs <= 0 {

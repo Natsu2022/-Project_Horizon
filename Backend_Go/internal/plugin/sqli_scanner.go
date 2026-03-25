@@ -84,7 +84,12 @@ var sqliTimePayloads = []string{
 	"'; WAITFOR DELAY '0:0:3'--", // MSSQL
 }
 
-type SQLiScanner struct{}
+type SQLiScanner struct {
+	// FullScan disables the early-exit optimisation: all three detection phases
+	// (error-based, boolean-blind, time-based) are always run for every parameter
+	// regardless of whether an earlier phase already produced a finding.
+	FullScan bool
+}
 
 func (s *SQLiScanner) Name() string {
 	return "sqli"
@@ -112,14 +117,19 @@ func (s *SQLiScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding
 		if f := sqliErrorBased(ctx, parsed, key, u.URL, idx); f != nil {
 			findings = append(findings, *f)
 			idx++
-			continue // confirmed for this param; skip boolean phase
+			if !s.FullScan {
+				continue // Normal/Timed mode: confirmed for this param; skip remaining phases
+			}
+			// Full Scan mode: continue to phases 2 & 3 to collect all evidence types
 		}
 
 		// Phase 2: boolean-based blind detection
 		if f := sqliBooleanBased(ctx, parsed, key, u.URL, idx); f != nil {
 			findings = append(findings, *f)
 			idx++
-			continue
+			if !s.FullScan {
+				continue // Normal/Timed mode: skip time-based phase
+			}
 		}
 
 		// Phase 3: time-based blind detection
@@ -143,7 +153,7 @@ func sqliErrorBased(ctx context.Context, parsed *url.URL, key, baseURL string, i
 		testQ.Set(key, payload)
 		testURL.RawQuery = testQ.Encode()
 
-		body, _, err := fetchSQLiBody(ctx, testURL.String())
+		body, _, reqDump, respDump, err := fetchSQLiBody(ctx, testURL.String())
 		if err != nil {
 			continue
 		}
@@ -162,6 +172,8 @@ func sqliErrorBased(ctx context.Context, parsed *url.URL, key, baseURL string, i
 			)
 			f.ID = buildID("SQL", baseURL, idx)
 			f.CWEIDs = []string{"CWE-89"}
+			f.Request = reqDump
+			f.Response = respDump
 			return &f
 		}
 	}
@@ -185,11 +197,11 @@ func sqliBooleanBased(ctx context.Context, parsed *url.URL, key, baseURL string,
 		fq.Set(key, pair.falsePayload)
 		falseURL.RawQuery = fq.Encode()
 
-		_, trueLen, err := fetchSQLiBody(ctx, trueURL.String())
+		_, trueLen, reqDump, respDump, err := fetchSQLiBody(ctx, trueURL.String())
 		if err != nil || trueLen == 0 {
 			continue
 		}
-		_, falseLen, err := fetchSQLiBody(ctx, falseURL.String())
+		_, falseLen, _, _, err := fetchSQLiBody(ctx, falseURL.String())
 		if err != nil {
 			continue
 		}
@@ -218,34 +230,36 @@ func sqliBooleanBased(ctx context.Context, parsed *url.URL, key, baseURL string,
 			)
 			f.ID = buildID("SQL", baseURL, idx)
 			f.CWEIDs = []string{"CWE-89"}
+			f.Request = reqDump
+			f.Response = respDump
 			return &f
 		}
 	}
 	return nil
 }
 
-// fetchSQLiBody performs a GET and returns the response body and its length.
-func fetchSQLiBody(ctx context.Context, rawURL string) ([]byte, int, error) {
+// fetchSQLiBody performs a GET and returns the response body, its length, and request/response dumps.
+func fetchSQLiBody(ctx context.Context, rawURL string) ([]byte, int, string, string, error) {
 	client := httpclient.NewClient()
 	req, err := httpclient.NewRequestCtx(ctx, rawURL)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", "", err
 	}
-	resp, err := client.Do(req)
+	resp, reqDump, respDump, err := httpclient.DoCapture(client, req)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, reqDump, "", err
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 	resp.Body.Close()
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, reqDump, respDump, err
 	}
-	return body, len(body), nil
+	return body, len(body), reqDump, respDump, nil
 }
 
 // sqliTimeBased tests time-delay payloads for a single parameter.
 func sqliTimeBased(ctx context.Context, parsed *url.URL, key, baseURL string, idx int) *model.Finding {
-	baseline := fetchSQLiTimed(ctx, parsed.String())
+	baseline, _, _ := fetchSQLiTimed(ctx, parsed.String())
 	if baseline == 0 {
 		return nil
 	}
@@ -263,7 +277,7 @@ func sqliTimeBased(ctx context.Context, parsed *url.URL, key, baseURL string, id
 		testQ.Set(key, payload)
 		testURL.RawQuery = testQ.Encode()
 
-		elapsed := fetchSQLiTimed(ctx, testURL.String())
+		elapsed, reqDump, respDump := fetchSQLiTimed(ctx, testURL.String())
 		if elapsed >= threshold {
 			f := model.NewFinding(
 				"sqli",
@@ -279,27 +293,29 @@ func sqliTimeBased(ctx context.Context, parsed *url.URL, key, baseURL string, id
 			)
 			f.ID = buildID("SQL", baseURL, idx)
 			f.CWEIDs = []string{"CWE-89"}
+			f.Request = reqDump
+			f.Response = respDump
 			return &f
 		}
 	}
 	return nil
 }
 
-// fetchSQLiTimed performs a GET and returns the response time in milliseconds.
-func fetchSQLiTimed(ctx context.Context, rawURL string) int64 {
+// fetchSQLiTimed performs a GET and returns the response time in milliseconds plus request/response dumps.
+func fetchSQLiTimed(ctx context.Context, rawURL string) (int64, string, string) {
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	req, err := httpclient.NewRequestCtx(ctx, rawURL)
 	if err != nil {
-		return 0
+		return 0, "", ""
 	}
 	start := time.Now()
-	resp, err := client.Do(req)
+	resp, reqDump, respDump, err := httpclient.DoCapture(client, req)
 	if err != nil {
-		return 0
+		return 0, reqDump, ""
 	}
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
-	return time.Since(start).Milliseconds()
+	return time.Since(start).Milliseconds(), reqDump, respDump
 }
 
 // sqliItoa converts an int to a decimal string without importing strconv.

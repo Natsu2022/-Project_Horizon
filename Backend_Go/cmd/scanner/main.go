@@ -29,6 +29,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"vuln_assessment_app/internal/api"
+	"vuln_assessment_app/internal/engine"
 )
 
 // main initialises the Gin router, registers routes, then blocks on r.Run().
@@ -47,6 +48,9 @@ func main() {
 	r.POST("/scan", api.ScanHandler)
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
+	})
+	r.GET("/progress", func(c *gin.Context) {
+		c.JSON(200, engine.GetProgress())
 	})
 
 	port := os.Getenv("VA_PORT")

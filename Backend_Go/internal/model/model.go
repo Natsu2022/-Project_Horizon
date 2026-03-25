@@ -45,6 +45,19 @@ type ModuleOptions struct {
 	BAC       bool `json:"bac"`
 }
 
+// AuthConfig holds credentials for form-based authentication.
+// When Enabled is true, the engine performs a login POST before crawling
+// and propagates the resulting session cookies to all scanner requests.
+// UsernameField / PasswordField are the HTML form field names (not the values).
+type AuthConfig struct {
+	Enabled       bool   `json:"enabled"`
+	LoginURL      string `json:"login_url"`
+	UsernameField string `json:"username_field"`
+	PasswordField string `json:"password_field"`
+	Username      string `json:"username"`
+	Password      string `json:"password"`
+}
+
 // ScanRequest is the JSON body sent by the GUI to POST /scan.
 // api.ScanHandler validates and clamps the fields before passing it to the engine.
 type ScanRequest struct {
@@ -58,6 +71,8 @@ type ScanRequest struct {
 	ZAPAPIKey      string        `json:"zap_api_key"`
 	TimedMode      bool          `json:"timed_mode"`
 	TimeLimitSecs  int           `json:"time_limit_secs"`
+	FullScanMode   bool          `json:"full_scan_mode"`
+	Auth           AuthConfig    `json:"auth"`
 }
 
 // Finding represents a single security vulnerability discovered by a plugin.
@@ -78,6 +93,8 @@ type Finding struct {
 	Recommendation string   `json:"recommendation"`
 	References     string   `json:"references"`
 	DetectedAt     string   `json:"detected_at"`
+	Request        string   `json:"request,omitempty"`
+	Response       string   `json:"response,omitempty"`
 }
 
 // ReportArtifact records the format and file path of a generated report.

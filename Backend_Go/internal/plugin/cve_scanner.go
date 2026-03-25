@@ -110,7 +110,7 @@ func (c *CVEScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 	if err != nil {
 		return nil
 	}
-	resp, err := client.Do(req)
+	resp, reqDump, respDump, err := httpclient.DoCapture(client, req)
 	if err != nil {
 		return nil
 	}
@@ -161,6 +161,8 @@ func (c *CVEScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 			)
 			f.ID = buildID("CVE", u.URL, idx)
 			f.CWEIDs = []string{"CWE-1104", "CWE-1395"}
+			f.Request = reqDump
+			f.Response = respDump
 			findings = append(findings, f)
 		}
 	}

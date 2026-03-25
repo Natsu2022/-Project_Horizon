@@ -30,7 +30,7 @@ BASE_URL = "http://127.0.0.1:5500"
 
 def _build_payload(target, options, report_formats, max_pages, max_depth, request_delay_ms,
                    zap_base_url="http://localhost:8880", zap_api_key="",
-                   timed_mode=False, time_limit_secs=0):
+                   timed_mode=False, time_limit_secs=0, full_scan_mode=False, auth=None):
     """Build the ScanRequest JSON payload dict from individual GUI input values."""
     return {
         "target": target,
@@ -52,12 +52,15 @@ def _build_payload(target, options, report_formats, max_pages, max_depth, reques
         "zap_api_key": zap_api_key,
         "timed_mode": timed_mode,
         "time_limit_secs": time_limit_secs,
+        "full_scan_mode": full_scan_mode,
+        "auth": auth or {"enabled": False, "login_url": "", "username_field": "",
+                         "password_field": "", "username": "", "password": ""},
     }
 
 
 def start_scan_with_session(session, target, options=None, report_formats=None, max_pages=30, max_depth=2,
                             request_delay_ms=100, zap_base_url="http://localhost:8880", zap_api_key="",
-                            timed_mode=False, time_limit_secs=0):
+                            timed_mode=False, time_limit_secs=0, full_scan_mode=False):
     """
     POST /scan using the provided requests.Session.
 
@@ -69,7 +72,7 @@ def start_scan_with_session(session, target, options=None, report_formats=None, 
     Raises requests.HTTPError on non-2xx responses.
     """
     payload = _build_payload(target, options, report_formats, max_pages, max_depth, request_delay_ms,
-                             zap_base_url, zap_api_key, timed_mode, time_limit_secs)
+                             zap_base_url, zap_api_key, timed_mode, time_limit_secs, full_scan_mode)
     r = session.post(f"{BASE_URL}/scan", json=payload, timeout=None)
     r.raise_for_status()
     return r.json()
@@ -77,10 +80,18 @@ def start_scan_with_session(session, target, options=None, report_formats=None, 
 
 def start_scan(target, options=None, report_formats=None, max_pages=30, max_depth=2,
                request_delay_ms=100, zap_base_url="http://localhost:8880", zap_api_key="",
-               timed_mode=False, time_limit_secs=0):
+               timed_mode=False, time_limit_secs=0, full_scan_mode=False):
     session = requests.Session()
     return start_scan_with_session(session, target, options, report_formats, max_pages, max_depth,
-                                   request_delay_ms, zap_base_url, zap_api_key, timed_mode, time_limit_secs)
+                                   request_delay_ms, zap_base_url, zap_api_key, timed_mode, time_limit_secs,
+                                   full_scan_mode)
+
+
+def progress_check():
+    """GET /progress → {"phase":..., "done":..., "total":..., "percent":...}"""
+    r = requests.get(f"{BASE_URL}/progress", timeout=2)
+    r.raise_for_status()
+    return r.json()
 
 
 def health_check():
