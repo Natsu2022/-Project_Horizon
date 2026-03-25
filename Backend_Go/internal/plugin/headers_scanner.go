@@ -41,7 +41,7 @@ func (h *HeaderScanner) Scan(ctx context.Context, u model.URLInfo) []model.Findi
 	if err != nil {
 		return nil
 	}
-	resp, err := client.Do(req)
+	resp, reqDump, respDump, err := httpclient.DoCapture(client, req)
 	if err != nil {
 		log.Println("[HeaderScanner] error:", err)
 		return nil
@@ -171,6 +171,8 @@ func (h *HeaderScanner) Scan(ctx context.Context, u model.URLInfo) []model.Findi
 
 	for i := range findings {
 		findings[i].ID = buildID("HDR", u.URL, i)
+		findings[i].Request = reqDump
+		findings[i].Response = respDump
 	}
 
 	return findings

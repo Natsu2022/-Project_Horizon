@@ -96,7 +96,8 @@ func (z *ZAPScanner) runZAPScan(ctx context.Context, target string) []model.Find
 	client := &http.Client{Timeout: 15 * time.Second}
 	base := strings.TrimRight(z.BaseURL, "/")
 
-	log.Printf("[ZAPScanner] starting spider on %s", target)
+	// Step 1 — Traditional spider (fast; works for standard HTML sites)
+	log.Printf("[ZAPScanner] step 1/4 traditional spider on %s", target)
 	spiderID := z.startScan(ctx, client, base, "spider", target)
 	if spiderID == "" {
 		log.Println("[ZAPScanner] failed to start spider — is ZAP running?")
@@ -106,7 +107,17 @@ func (z *ZAPScanner) runZAPScan(ctx context.Context, target string) []model.Find
 		return nil
 	}
 
-	log.Printf("[ZAPScanner] starting active scan on %s", target)
+	// Step 2 — AJAX spider (uses a real browser; discovers JS-rendered content
+	// in Angular / React / Vue SPAs that the traditional spider misses)
+	log.Printf("[ZAPScanner] step 2/4 AJAX spider on %s", target)
+	if !z.runAjaxSpider(ctx, client, base, target) {
+		// AJAX spider is optional — older ZAP versions or missing browser
+		// add-on will fail here; we continue to active scan anyway.
+		log.Println("[ZAPScanner] AJAX spider unavailable or failed — continuing without it")
+	}
+
+	// Step 3 — Active scan (attack phase)
+	log.Printf("[ZAPScanner] step 3/4 active scan on %s", target)
 	ascanID := z.startScan(ctx, client, base, "ascan", target)
 	if ascanID == "" {
 		log.Println("[ZAPScanner] failed to start active scan")
@@ -116,7 +127,63 @@ func (z *ZAPScanner) runZAPScan(ctx context.Context, target string) []model.Find
 		return nil
 	}
 
+	// Step 4 — Collect alerts
+	log.Printf("[ZAPScanner] step 4/4 fetching alerts")
 	return z.fetchAlerts(ctx, client, base, target)
+}
+
+// runAjaxSpider starts ZAP's AJAX spider and waits until it stops.
+//
+// The AJAX spider opens a real (headless) browser session managed by ZAP,
+// clicks links, and submits forms — allowing it to discover URLs that only
+// appear after JavaScript execution (Angular, React, Vue SPAs).
+//
+// Status values returned by /JSON/ajaxSpider/view/status/:
+//
+//	"running" — still crawling
+//	"stopped"  — finished (timeout reached or no new URLs found)
+//
+// Returns false if the AJAX spider add-on is not installed or the request
+// fails; the caller should treat this as a non-fatal condition.
+func (z *ZAPScanner) runAjaxSpider(ctx context.Context, client *http.Client, base, target string) bool {
+	// Start the AJAX spider
+	startEP := fmt.Sprintf("%s/JSON/ajaxSpider/action/scan/?apikey=%s&url=%s",
+		base, url.QueryEscape(z.APIKey), url.QueryEscape(target))
+	body := z.getJSON(ctx, client, startEP)
+	if body == nil || !strings.Contains(string(body), "OK") {
+		return false
+	}
+
+	// Poll every 5 s until status == "stopped" or context is cancelled
+	statusEP := fmt.Sprintf("%s/JSON/ajaxSpider/view/status/?apikey=%s",
+		base, url.QueryEscape(z.APIKey))
+	stopEP := fmt.Sprintf("%s/JSON/ajaxSpider/action/stop/?apikey=%s",
+		base, url.QueryEscape(z.APIKey))
+
+	for {
+		if ctx.Err() != nil {
+			z.getJSON(ctx, client, stopEP) // best-effort stop
+			return false
+		}
+		statusBody := z.getJSON(ctx, client, statusEP)
+		if statusBody != nil {
+			var st struct {
+				Status string `json:"status"`
+			}
+			if err := json.Unmarshal(statusBody, &st); err == nil {
+				log.Printf("[ZAPScanner] ajaxSpider: %s", st.Status)
+				if st.Status == "stopped" {
+					return true
+				}
+			}
+		}
+		select {
+		case <-ctx.Done():
+			z.getJSON(ctx, client, stopEP)
+			return false
+		case <-time.After(5 * time.Second):
+		}
+	}
 }
 
 // startScan triggers a ZAP spider or active scan and returns the scan ID.
@@ -173,12 +240,15 @@ func (z *ZAPScanner) fetchAlerts(ctx context.Context, client *http.Client, base,
 		return nil
 	}
 
+	log.Printf("[ZAPScanner] raw alerts from ZAP: %d total", len(resp.Alerts))
+	infoSkipped := 0
 	findings := make([]model.Finding, 0, len(resp.Alerts))
 	idx := 0
 	for _, alert := range resp.Alerts {
 		sev := zapRiskToSeverity(alert.RiskCode)
 		if sev == "" {
-			continue // skip Informational
+			infoSkipped++
+			continue // skip Informational (riskcode=0)
 		}
 		owasp, owaspURL := zapOWASPCategory(alert.Alert)
 
@@ -233,7 +303,8 @@ func (z *ZAPScanner) fetchAlerts(ctx context.Context, client *http.Client, base,
 		}
 	}
 
-	log.Printf("[ZAPScanner] %d findings from %d alerts", len(findings), len(resp.Alerts))
+	log.Printf("[ZAPScanner] %d findings from %d alerts (%d informational skipped)",
+		len(findings), len(resp.Alerts), infoSkipped)
 	return findings
 }
 

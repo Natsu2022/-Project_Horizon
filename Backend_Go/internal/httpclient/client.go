@@ -20,12 +20,30 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
+	"net/http/httputil"
 	"time"
 )
+
+// sessionJar is a shared cookie jar set once per scan by engine.SetSessionJar().
+// nil means no session — each request is unauthenticated.
+// Not concurrency-safe across simultaneous scans; this app runs one scan at a time.
+var sessionJar http.CookieJar
+
+// SetSessionJar sets the cookie jar used by all NewClient / NewClientNoRedirect calls.
+// Call with a populated jar after login, and call SetSessionJar(nil) after the scan.
+func SetSessionJar(jar http.CookieJar) { sessionJar = jar }
+
+// NewCookieJar creates a new cookie jar for use with SetSessionJar.
+func NewCookieJar() http.CookieJar {
+	jar, _ := cookiejar.New(nil)
+	return jar
+}
 
 func NewClient() *http.Client {
 	return &http.Client{
 		Timeout: 8 * time.Second,
+		Jar:     sessionJar,
 		Transport: &http.Transport{
 			ForceAttemptHTTP2: false,
 		},
@@ -37,6 +55,7 @@ func NewClient() *http.Client {
 func NewClientNoRedirect() *http.Client {
 	return &http.Client{
 		Timeout: 8 * time.Second,
+		Jar:     sessionJar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
@@ -75,6 +94,19 @@ func NewMethodRequestCtx(ctx context.Context, method, rawURL string) (*http.Requ
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	return req, nil
+}
+
+// DoCapture executes req and returns (response, requestDump, responseHeadersDump, error).
+// Only response headers are captured — the body is NOT consumed so callers
+// can still read resp.Body normally with io.ReadAll / io.LimitReader.
+func DoCapture(client *http.Client, req *http.Request) (*http.Response, string, string, error) {
+	reqBytes, _ := httputil.DumpRequestOut(req, false)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, string(reqBytes), "", err
+	}
+	respBytes, _ := httputil.DumpResponse(resp, false) // false = headers only, body untouched
+	return resp, string(reqBytes), string(respBytes), nil
 }
 
 // EnsureURLScheme prepends "https://" to rawURL if no scheme is present.

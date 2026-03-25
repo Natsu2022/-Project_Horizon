@@ -332,6 +332,8 @@ func drawDetailedFindings(pdf *fpdf.Fpdf, payload reportPayload) {
 			{"Recommendation", f.Recommendation},
 			{"References", f.References},
 			{"Detected At", f.DetectedAt},
+			{"Request", f.Request},
+			{"Response", f.Response},
 		}
 
 		for _, row := range details {
@@ -347,7 +349,7 @@ func drawDetailedFindings(pdf *fpdf.Fpdf, payload reportPayload) {
 			pdf.SetTextColor(40, 75, 140)
 			pdf.CellFormat(32, 5, tr(pdf, row[0]), "", 0, "L", false, 0, "")
 
-			if row[0] == "Evidence" {
+			if row[0] == "Evidence" || row[0] == "Request" || row[0] == "Response" {
 				// Monospace code box with light blue background
 				pdf.SetFillColor(240, 245, 255)
 				pdf.SetDrawColor(160, 190, 230)

@@ -25,6 +25,8 @@ type htmlFinding struct {
 	Recommendation string
 	References     string
 	DetectedAt     string
+	Request        string
+	Response       string
 }
 
 type moduleCount struct {
@@ -78,6 +80,8 @@ func buildHTMLData(payload reportPayload) htmlReportData {
 			Recommendation: f.Recommendation,
 			References:     f.References,
 			DetectedAt:     f.DetectedAt,
+			Request:        f.Request,
+			Response:       f.Response,
 		})
 	}
 	modules := make([]moduleCount, 0, len(moduleCounts))
@@ -172,22 +176,6 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
 .detail-exp-row{display:none}
 .detail-exp-row>td{padding:0;border-bottom:2px solid rgba(56,139,253,.2)}
 .detail-exp-cell{background:#0d1117;border-left:3px solid #388bfd;padding:16px 24px}
-/* ── Detailed view (cards) ──────────────────────────── */
-#detailed-view{display:none}
-.finding-card{background:#161b22;border:1px solid #30363d;border-radius:10px;margin-bottom:10px;overflow:hidden}
-.finding-card.critical{border-left:4px solid #da3633}
-.finding-card.high{border-left:4px solid #e3882b}
-.finding-card.medium{border-left:4px solid #d4ac0d}
-.finding-card.low{border-left:4px solid #1f6feb}
-.card-header{align-items:center;cursor:pointer;display:flex;justify-content:space-between;padding:14px 18px;user-select:none}
-.card-header:hover{background:#1c2128}
-.card-title-row{display:flex;align-items:center;gap:10px;font-weight:600;font-size:14px}
-.card-subtitle{color:#8b949e;font-size:11px;margin-top:3px;display:flex;flex-wrap:wrap;gap:10px}
-.card-subtitle span{display:flex;align-items:center;gap:3px}
-.chevron{color:#8b949e;font-size:16px;font-weight:700;transition:transform .2s;flex-shrink:0}
-.chevron.open{transform:rotate(180deg)}
-.card-body{border-top:1px solid #30363d;display:none;padding:18px 20px}
-.card-body.open{display:block}
 /* ── Shared detail content ──────────────────────────── */
 .detail-grid{display:grid;gap:12px}
 .detail-row{display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:start}
@@ -278,18 +266,6 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
     </div>
   </div>
 
-  <!-- View Toolbar -->
-  <div class="toolbar">
-    <div class="btn-group">
-      <button class="btn active" id="btn-summary"  onclick="showView('summary')">Summary</button>
-      <button class="btn"        id="btn-detailed" onclick="showView('detailed')">Detailed</button>
-    </div>
-    <div class="btn-group">
-      <button class="btn" onclick="expandAll()">Expand All</button>
-      <button class="btn" onclick="collapseAll()">Collapse All</button>
-    </div>
-  </div>
-
   <!-- Summary View -->
   <div id="summary-view">
     <table>
@@ -373,6 +349,18 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
                   <span class="detail-value" style="color:#8b949e;font-size:12px">{{.DetectedAt}}</span>
                 </div>
                 {{end}}
+                {{if .Request}}
+                <div class="detail-row">
+                  <span class="detail-label">Request</span>
+                  <span class="detail-value"><div class="evidence-box">{{.Request}}</div></span>
+                </div>
+                {{end}}
+                {{if .Response}}
+                <div class="detail-row">
+                  <span class="detail-label">Response</span>
+                  <span class="detail-value"><div class="evidence-box">{{.Response}}</div></span>
+                </div>
+                {{end}}
               </div>
             </div>
           </td>
@@ -382,92 +370,10 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
     </table>
   </div>
 
-  <!-- Detailed View (expandable cards) -->
-  <div id="detailed-view">
-    {{range .Findings}}
-    <div class="finding-card {{.SevClass}}" data-sev="{{.SevClass}}">
-      <div class="card-header" onclick="toggleCard(this)">
-        <div>
-          <div class="card-title-row">
-            <span class="badge {{.SevClass}}">{{.Severity}}</span>
-            {{.Title}}
-            <span class="cvss-pill">{{.CVSSScore}}</span>
-          </div>
-          <div class="card-subtitle">
-            <span>&#x1F9E9; {{.Module}}</span>
-            <span>&#x1F4CC; {{.OWASPCategory}}</span>
-            {{if .CWEIDs}}<span>&#x1F6E1; {{.CWEIDs}}</span>{{end}}
-          </div>
-        </div>
-        <span class="chevron">&#x25BC;</span>
-      </div>
-      <div class="card-body">
-        <div class="detail-grid">
-          <div class="detail-row">
-            <span class="detail-label">URL</span>
-            <span class="detail-value"><a href="{{.TargetURL}}" target="_blank" rel="noopener">{{.TargetURL}}</a></span>
-          </div>
-          {{if .CWEIDs}}
-          <div class="detail-row">
-            <span class="detail-label">CWE</span>
-            <span class="detail-value" style="font-family:monospace;color:#79c0ff">{{.CWEIDs}}</span>
-          </div>
-          {{end}}
-          {{if .Description}}
-          <div class="detail-row">
-            <span class="detail-label">Description</span>
-            <span class="detail-value">{{.Description}}</span>
-          </div>
-          {{end}}
-          {{if .Evidence}}
-          <div class="detail-row">
-            <span class="detail-label">Evidence</span>
-            <span class="detail-value"><div class="evidence-box">{{.Evidence}}</div></span>
-          </div>
-          {{end}}
-          {{if .Recommendation}}
-          <div class="detail-row">
-            <span class="detail-label">Recommendation</span>
-            <span class="detail-value">{{.Recommendation}}</span>
-          </div>
-          {{end}}
-          {{if .References}}
-          <div class="detail-row">
-            <span class="detail-label">References</span>
-            <span class="detail-value refs-box">{{.References}}</span>
-          </div>
-          {{end}}
-          {{if .DetectedAt}}
-          <div class="detail-row">
-            <span class="detail-label">Detected At</span>
-            <span class="detail-value" style="color:#8b949e;font-size:12px">{{.DetectedAt}}</span>
-          </div>
-          {{end}}
-        </div>
-      </div>
-    </div>
-    {{end}}
-  </div>
-
   {{end}}
 </div>
 
 <script>
-// ── View toggle (Summary / Detailed) ──────────────────────────────────────────
-function showView(v) {
-  var s  = document.getElementById('summary-view');
-  var d  = document.getElementById('detailed-view');
-  var bs = document.getElementById('btn-summary');
-  var bd = document.getElementById('btn-detailed');
-  if (v === 'summary') {
-    s.style.display = ''; d.style.display = 'none';
-    bs.classList.add('active'); bd.classList.remove('active');
-  } else {
-    s.style.display = 'none'; d.style.display = '';
-    bs.classList.remove('active'); bd.classList.add('active');
-  }
-}
-
 // ── Severity filter (multi-select) ────────────────────────────────────────────
 // activeSevs tracks which severities are selected.
 // 'all' = show everything; selecting individual severities replaces 'all'.
@@ -516,10 +422,6 @@ function applyFilter() {
     }
   });
 
-  // Detailed-view cards
-  document.querySelectorAll('#detailed-view .finding-card').forEach(function(card) {
-    card.style.display = (showAll || activeSevs.has(card.dataset.sev)) ? '' : 'none';
-  });
 }
 
 // ── Inline detail toggle in summary row ───────────────────────────────────────
@@ -538,24 +440,6 @@ function toggleDetail(btn) {
   }
 }
 
-// ── Expand / Collapse All (Detailed view cards) ───────────────────────────────
-function expandAll() {
-  document.querySelectorAll('.card-body').forEach(function(b)  { b.classList.add('open'); });
-  document.querySelectorAll('.chevron').forEach(function(c)    { c.classList.add('open'); });
-}
-function collapseAll() {
-  document.querySelectorAll('.card-body').forEach(function(b)  { b.classList.remove('open'); });
-  document.querySelectorAll('.chevron').forEach(function(c)    { c.classList.remove('open'); });
-}
-
-// ── Card toggle (Detailed view) ───────────────────────────────────────────────
-function toggleCard(header) {
-  var body    = header.nextElementSibling;
-  var chevron = header.querySelector('.chevron');
-  var open    = body.classList.contains('open');
-  body.classList.toggle('open', !open);
-  chevron.classList.toggle('open', !open);
-}
 </script>
 </body>
 </html>`
