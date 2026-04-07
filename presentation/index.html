@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project Horizon — VA Scanner Presentation</title>
+
+<!-- Reveal.js CDN -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+
+<style>
+/* ═══════════════════════════════════════════════
+   THEME — Space / Cybersecurity Earth
+   ═══════════════════════════════════════════════ */
+:root {
+  --bg:        #020818;
+  --bg2:       #061428;
+  --bg3:       #0a1f3a;
+  --cyan:      #00e5cc;
+  --blue:      #1a6fff;
+  --blue2:     #0d4bcc;
+  --text:      #e0f0ff;
+  --text-dim:  #7aaccc;
+  --danger:    #ff4444;
+  --warn:      #e07b20;
+  --low:       #f5c842;
+  --ok:        #00e5cc;
+  --card-bg:   rgba(10,31,58,0.85);
+  --border:    rgba(0,229,204,0.25);
+}
+
+.reveal-viewport { background: var(--bg); }
+
+.reveal {
+  font-family: 'Segoe UI', 'Noto Sans Thai', sans-serif;
+  font-size: 36px;
+  color: var(--text);
+}
+
+/* ── Slide Base ── */
+.reveal .slides section {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 60px;
+  box-sizing: border-box;
+}
+
+/* ── Headings ── */
+.reveal h1 {
+  font-size: 2.4em;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--cyan), var(--blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -1px;
+  margin-bottom: 0.2em;
+  text-shadow: none;
+}
+.reveal h2 {
+  font-size: 1.5em;
+  color: var(--cyan);
+  font-weight: 700;
+  margin-bottom: 0.4em;
+  text-align: left;
+  width: 100%;
+  border-left: 4px solid var(--cyan);
+  padding-left: 16px;
+}
+.reveal h3 {
+  font-size: 1.1em;
+  color: var(--blue);
+  font-weight: 600;
+  margin-bottom: 0.3em;
+}
+.reveal p, .reveal li {
+  font-size: 0.72em;
+  line-height: 1.7;
+  color: var(--text);
+}
+.reveal ul { text-align: left; width: 100%; padding-left: 1.2em; }
+.reveal li { margin-bottom: 0.35em; }
+.reveal li::marker { color: var(--cyan); }
+
+/* ── Slide label top-right ── */
+.slide-label {
+  position: absolute; top: 18px; right: 28px;
+  font-size: 0.32em; color: var(--text-dim);
+  letter-spacing: 2px; text-transform: uppercase;
+}
+
+/* ── Divider ── */
+.divider {
+  width: 80px; height: 3px;
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+  border-radius: 2px;
+  margin: 12px 0 24px 0;
+}
+
+/* ── Cards ── */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 18px;
+  width: 100%;
+  margin-top: 20px;
+}
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 20px;
+  transition: border-color 0.3s;
+}
+.card:hover { border-color: var(--cyan); }
+.card .icon { font-size: 1.8em; margin-bottom: 10px; }
+.card h3 { font-size: 0.75em; margin: 0 0 8px; color: var(--cyan); }
+.card p  { font-size: 0.55em; color: var(--text-dim); margin: 0; line-height: 1.5; }
+
+/* ── Severity badges ── */
+.badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.5em;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.badge-critical { background: rgba(255,68,68,0.2); color: var(--danger); border: 1px solid var(--danger); }
+.badge-high     { background: rgba(224,123,32,0.2); color: var(--warn);   border: 1px solid var(--warn);   }
+.badge-medium   { background: rgba(26,111,255,0.2); color: #64b0ff;       border: 1px solid #64b0ff;       }
+.badge-low      { background: rgba(0,229,204,0.15); color: var(--cyan);   border: 1px solid var(--cyan);   }
+
+/* ── Two-col layout ── */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  width: 100%;
+  align-items: start;
+}
+
+/* ── Stat boxes ── */
+.stat-row {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+.stat-box {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 28px;
+  text-align: center;
+  min-width: 120px;
+}
+.stat-box .num {
+  font-size: 2em;
+  font-weight: 900;
+  line-height: 1;
+  display: block;
+}
+.stat-box .lbl {
+  font-size: 0.42em;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.stat-box.high     .num { color: var(--warn);   }
+.stat-box.medium   .num { color: #64b0ff; }
+.stat-box.low      .num { color: var(--cyan);   }
+.stat-box.total    .num { color: var(--text);   }
+
+/* ── OWASP matrix ── */
+.owasp-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+.owasp-cell {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 8px;
+  text-align: center;
+  font-size: 0.4em;
+  transition: all 0.4s;
+  opacity: 0;
+}
+.owasp-cell.covered {
+  border-color: var(--cyan);
+  background: rgba(0,229,204,0.08);
+}
+.owasp-cell.covered .owasp-label { color: var(--cyan); }
+.owasp-cell.partial { border-color: var(--warn); }
+.owasp-cell.partial .owasp-label { color: var(--warn); }
+.owasp-cell.none { opacity: 0.4; }
+.owasp-cell .owasp-id { font-weight: 800; font-size: 1.2em; margin-bottom: 4px; }
+.owasp-cell .owasp-label { font-size: 0.85em; color: var(--text-dim); line-height: 1.3; }
+.owasp-cell .owasp-icon { font-size: 1.5em; margin-bottom: 6px; }
+
+/* ── Phase timeline ── */
+.phase-list { width: 100%; }
+.phase-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  opacity: 0;
+  transform: translateX(-30px);
+  transition: all 0.5s;
+}
+.phase-item.show { opacity: 1; transform: translateX(0); }
+.phase-num {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--cyan), var(--blue));
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.55em; font-weight: 900; color: var(--bg);
+  flex-shrink: 0;
+}
+.phase-bar-wrap { flex: 1; }
+.phase-bar-wrap p { font-size: 0.5em; color: var(--text-dim); margin: 3px 0 6px; }
+.phase-track {
+  background: var(--bg3);
+  border-radius: 6px;
+  height: 8px;
+  overflow: hidden;
+}
+.phase-fill {
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--cyan), var(--blue));
+  width: 0;
+  transition: width 1.2s cubic-bezier(.25,.8,.25,1);
+}
+.phase-speed { font-size: 0.42em; color: var(--text-dim); text-align: right; }
+
+/* ── Architecture diagram ── */
+.arch-diagram {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  justify-content: center;
+  margin-top: 10px;
+}
+.arch-box {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  text-align: center;
+  min-width: 130px;
+  transition: border-color 0.4s, box-shadow 0.4s;
+}
+.arch-box.glow {
+  border-color: var(--cyan);
+  box-shadow: 0 0 20px rgba(0,229,204,0.3);
+}
+.arch-box h4 { font-size: 0.5em; color: var(--cyan); margin: 0 0 6px; }
+.arch-box p  { font-size: 0.38em; color: var(--text-dim); margin: 0; line-height: 1.5; }
+.arch-arrow {
+  font-size: 0.8em;
+  color: var(--cyan);
+  padding: 0 10px;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+.arch-arrow.show { opacity: 1; }
+
+/* ── Plugin grid ── */
+.plugin-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  width: 100%;
+  margin-top: 16px;
+}
+.plugin-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 12px;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.4s;
+}
+.plugin-card.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.plugin-card:hover {
+  border-color: var(--cyan);
+  box-shadow: 0 0 16px rgba(0,229,204,0.2);
+}
+.plugin-card .p-icon { font-size: 1.5em; margin-bottom: 8px; }
+.plugin-card .p-name { font-size: 0.48em; font-weight: 700; color: var(--cyan); }
+.plugin-card .p-owasp { font-size: 0.38em; color: var(--text-dim); margin-top: 4px; }
+
+/* ── Canvas stars bg ── */
+#stars-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+}
+.reveal .slides { z-index: 1; }
+
+/* ── Typewriter ── */
+.typewriter {
+  overflow: hidden;
+  border-right: 3px solid var(--cyan);
+  white-space: nowrap;
+  animation: typing 2.5s steps(30,end), blink 0.75s step-end infinite;
+}
+@keyframes typing {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+@keyframes blink {
+  from, to { border-color: transparent; }
+  50%       { border-color: var(--cyan); }
+}
+
+/* ── Glow pulse ── */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 10px rgba(0,229,204,0.2); }
+  50%       { box-shadow: 0 0 30px rgba(0,229,204,0.5); }
+}
+.pulse { animation: pulse-glow 2.5s ease-in-out infinite; }
+
+/* ── Counter ── */
+.counter-wrap {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 24px 0;
+}
+.counter-box {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px 32px;
+  text-align: center;
+  min-width: 140px;
+}
+.counter-num {
+  font-size: 2.8em;
+  font-weight: 900;
+  display: block;
+  line-height: 1;
+}
+.counter-lbl {
+  font-size: 0.38em;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+/* ── findings table ── */
+.findings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.42em;
+  margin-top: 16px;
+}
+.findings-table th {
+  background: var(--bg3);
+  color: var(--cyan);
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.9em;
+  letter-spacing: 1px;
+}
+.findings-table td {
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(0,229,204,0.08);
+  color: var(--text);
+  vertical-align: middle;
+}
+.findings-table tr:hover td { background: rgba(0,229,204,0.04); }
+
+/* ── bar chart ── */
+.bar-chart { width: 100%; margin-top: 20px; }
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.bar-label { width: 100px; font-size: 0.42em; color: var(--text-dim); text-align: right; flex-shrink: 0; }
+.bar-track { flex: 1; background: var(--bg3); border-radius: 6px; height: 12px; overflow: hidden; }
+.bar-fill  { height: 100%; border-radius: 6px; width: 0; transition: width 1.4s cubic-bezier(.25,.8,.25,1); }
+.bar-val   { font-size: 0.42em; color: var(--text); width: 36px; flex-shrink: 0; }
+
+/* ── Law card ── */
+.law-card {
+  background: linear-gradient(135deg, rgba(0,229,204,0.05), rgba(26,111,255,0.08));
+  border: 1px solid var(--cyan);
+  border-radius: 14px;
+  padding: 24px 28px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.law-card .quote {
+  font-size: 0.55em;
+  font-style: italic;
+  color: var(--text);
+  line-height: 1.8;
+  border-left: 3px solid var(--cyan);
+  padding-left: 16px;
+  margin: 12px 0;
+}
+.law-card .source {
+  font-size: 0.42em;
+  color: var(--text-dim);
+  text-align: right;
+  margin-top: 10px;
+}
+
+/* ── Cover ── */
+#cover-title {
+  font-size: 2.6em;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--cyan) 0%, var(--blue) 60%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.1;
+  text-align: center;
+}
+#cover-sub {
+  font-size: 0.65em;
+  color: var(--text-dim);
+  margin-top: 14px;
+  text-align: center;
+}
+.cover-tags {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 24px;
+}
+.cover-tag {
+  background: rgba(0,229,204,0.1);
+  border: 1px solid var(--cyan);
+  border-radius: 20px;
+  padding: 4px 16px;
+  font-size: 0.38em;
+  color: var(--cyan);
+  letter-spacing: 1px;
+}
+
+/* ── Earth SVG glow ── */
+.earth-wrap {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  margin: 0 auto 20px;
+}
+.earth-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%; height: 100%;
+  border: 1.5px solid rgba(0,229,204,0.3);
+  border-radius: 50%;
+  animation: spin-ring 12s linear infinite;
+}
+@keyframes spin-ring {
+  from { transform: translate(-50%,-50%) rotateX(75deg) rotate(0deg); }
+  to   { transform: translate(-50%,-50%) rotateX(75deg) rotate(360deg); }
+}
+
+/* ── Limitation card ── */
+.limit-card {
+  background: var(--card-bg);
+  border: 1px solid rgba(255,68,68,0.3);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+.limit-card h4 { color: var(--danger); font-size: 0.55em; margin: 0 0 6px; }
+.limit-card p  { font-size: 0.45em; color: var(--text-dim); margin: 0; }
+
+/* ── QA ── */
+.qa-box {
+  background: linear-gradient(135deg, rgba(0,229,204,0.05), rgba(26,111,255,0.1));
+  border: 1px solid var(--cyan);
+  border-radius: 20px;
+  padding: 40px 60px;
+  text-align: center;
+}
+.qa-box h1 { font-size: 3em; margin-bottom: 0.2em; }
+.qa-box p  { font-size: 0.55em; color: var(--text-dim); }
+
+/* ── Fragment overrides ── */
+.reveal .fragment { opacity: 0; transform: translateY(16px); transition: all 0.5s; }
+.reveal .fragment.visible { opacity: 1; transform: translateY(0); }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--blue2); border-radius: 2px; }
+
+/* ── Slide number ── */
+.reveal .slide-number { color: var(--text-dim); font-size: 0.3em; }
+
+/* progress bar */
+.reveal .progress { color: var(--cyan); height: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Star field canvas -->
+<canvas id="stars-canvas"></canvas>
+
+<div class="reveal">
+<div class="slides">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 01 — COVER                               -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="s-cover">
+  <div style="text-align:center; width:100%;">
+
+    <!-- Earth globe SVG -->
+    <div class="earth-wrap" style="margin-bottom:24px;">
+      <svg viewBox="0 0 220 220" style="width:220px;height:220px;">
+        <defs>
+          <radialGradient id="globe-grad" cx="40%" cy="35%">
+            <stop offset="0%"   stop-color="#1a6fff" stop-opacity="0.9"/>
+            <stop offset="50%"  stop-color="#061428"/>
+            <stop offset="100%" stop-color="#020818"/>
+          </radialGradient>
+          <radialGradient id="glow-grad" cx="50%" cy="50%">
+            <stop offset="60%"  stop-color="transparent"/>
+            <stop offset="100%" stop-color="rgba(0,229,204,0.3)"/>
+          </radialGradient>
+        </defs>
+        <!-- glow ring -->
+        <circle cx="110" cy="110" r="108" fill="url(#glow-grad)"/>
+        <!-- globe body -->
+        <circle cx="110" cy="110" r="90" fill="url(#globe-grad)" stroke="rgba(0,229,204,0.4)" stroke-width="1.5"/>
+        <!-- continent blobs -->
+        <ellipse cx="90" cy="85" rx="28" ry="18" fill="rgba(0,229,204,0.18)" transform="rotate(-15,90,85)"/>
+        <ellipse cx="140" cy="100" rx="20" ry="28" fill="rgba(0,229,204,0.12)" transform="rotate(10,140,100)"/>
+        <ellipse cx="80" cy="135" rx="24" ry="14" fill="rgba(0,229,204,0.14)" transform="rotate(5,80,135)"/>
+        <ellipse cx="150" cy="145" rx="16" ry="12" fill="rgba(0,229,204,0.1)"/>
+        <!-- latitude lines -->
+        <ellipse cx="110" cy="110" rx="90" ry="22" fill="none" stroke="rgba(0,229,204,0.12)" stroke-width="1"/>
+        <ellipse cx="110" cy="110" rx="90" ry="50" fill="none" stroke="rgba(0,229,204,0.08)" stroke-width="1"/>
+        <!-- meridian -->
+        <ellipse cx="110" cy="110" rx="36" ry="90" fill="none" stroke="rgba(0,229,204,0.1)" stroke-width="1"/>
+        <!-- scan ring animate -->
+        <circle cx="110" cy="110" r="100" fill="none" stroke="rgba(0,229,204,0.6)" stroke-width="1.5"
+                stroke-dasharray="50 580" stroke-linecap="round">
+          <animateTransform attributeName="transform" type="rotate" from="0 110 110" to="360 110 110" dur="4s" repeatCount="indefinite"/>
+        </circle>
+      </svg>
+    </div>
+
+    <div id="cover-title">Project Horizon</div>
+    <div id="cover-sub">ระบบประเมินช่องโหว่เว็บแอปพลิเคชันอัตโนมัติ<br>Web Application Vulnerability Assessment Scanner</div>
+
+    <div class="cover-tags">
+      <span class="cover-tag">OWASP Top 10:2025</span>
+      <span class="cover-tag">Go Backend</span>
+      <span class="cover-tag">PyQt6 GUI</span>
+      <span class="cover-tag">8 Scanner Modules</span>
+      <span class="cover-tag">กสทช. 1.3</span>
+    </div>
+
+    <p style="font-size:0.38em; color:var(--text-dim); margin-top:32px;">
+      ภูมินทร์ ทองลา &nbsp;|&nbsp; ปีการศึกษา 2568
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 02 — ปัญหา / Background                 -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">02 / Background</span>
+  <h2>ที่มาและความสำคัญ</h2>
+  <div class="divider"></div>
+
+  <div class="two-col" style="gap:40px; align-items:center;">
+    <div>
+      <ul>
+        <li class="fragment">การโจมตีเว็บแอปพลิเคชันเพิ่มขึ้น <strong style="color:var(--warn);">65%</strong> ในปี 2024</li>
+        <li class="fragment">Penetration Testing แบบ Manual ต้องการ<br>ผู้เชี่ยวชาญและใช้เวลานาน</li>
+        <li class="fragment">กสทช. กำหนดให้ทำ VA/Pentest<br><strong style="color:var(--cyan);">อย่างน้อยปีละ 1 ครั้ง</strong></li>
+        <li class="fragment">เครื่องมือที่มีในตลาด (Burp Suite, Nessus)<br>มีราคาสูง และซับซ้อนสำหรับผู้เริ่มต้น</li>
+      </ul>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <div class="stat-box high fragment" style="padding:24px;">
+        <span class="num">65%</span>
+        <span class="lbl">เพิ่มขึ้นของการโจมตี Web App</span>
+      </div>
+      <div class="stat-box medium fragment" style="padding:24px;">
+        <span class="num">7/10</span>
+        <span class="lbl">OWASP Top 10:2025 ที่ระบบครอบคลุม</span>
+      </div>
+      <div class="stat-box fragment" style="padding:24px; border-color:var(--cyan);">
+        <span class="num" style="color:var(--cyan);">฿0</span>
+        <span class="lbl">Open-source — ใช้ฟรี</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 03 — วัตถุประสงค์                        -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">03 / Objectives</span>
+  <h2>วัตถุประสงค์การวิจัย</h2>
+  <div class="divider"></div>
+
+  <div class="card-grid" style="grid-template-columns: repeat(2,1fr); gap:20px; margin-top:24px;">
+    <div class="card fragment">
+      <div class="icon">🎯</div>
+      <h3>พัฒนาระบบ VA Scanner</h3>
+      <p>สร้างเครื่องมือตรวจจับช่องโหว่เว็บแอปพลิเคชันอัตโนมัติ ครอบคลุม OWASP Top 10:2025</p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">📋</div>
+      <h3>สนับสนุนข้อกำหนด กสทช.</h3>
+      <p>ตอบสนองข้อ 1.3 ประมวลแนวปฏิบัติ กสทช. 2565 ด้าน Vulnerability Assessment & Penetration Testing</p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">🔌</div>
+      <h3>สถาปัตยกรรมแบบ Plugin</h3>
+      <p>ออกแบบให้ขยายได้ง่าย เพิ่ม scanner module ใหม่โดยไม่กระทบระบบหลัก</p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">📊</div>
+      <h3>รายงานครบถ้วน</h3>
+      <p>ส่งออกผลลัพธ์เป็น JSON, HTML, PDF พร้อม CVSS score, OWASP category และ CWE</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 04 — กรอบกฎหมาย กสทช.                  -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">04 / Legal Framework</span>
+  <h2>กรอบกฎหมาย — กสทช. 2565</h2>
+  <div class="divider"></div>
+
+  <div class="law-card fragment">
+    <div class="quote">
+      "หน่วยงานโครงสร้างพื้นฐานสำคัญทางสารสนเทศควรดำเนินการ<strong>ทดสอบเจาะระบบอย่างน้อยปีละ 1 ครั้ง</strong>
+      โดยเฉพาะอย่างยิ่ง ระบบเทคโนโลยีสารสนเทศ (IT) ที่เชื่อมต่อกับ<strong>อินเทอร์เน็ต (Internet Facing)</strong>"
+    </div>
+    <div class="source">— ประมวลแนวปฏิบัติฯ กสทช. ฉบับ 7 ธ.ค. 2565 | หมวด 1.3 ข้อ (6)</div>
+  </div>
+
+  <div style="display:flex; align-items:center; gap:20px; margin-top:28px; width:100%; justify-content:center;" class="fragment">
+    <div style="background:var(--card-bg); border:1px solid var(--border); border-radius:10px; padding:14px 20px; text-align:center; font-size:0.45em;">
+      <div style="color:var(--cyan); font-weight:700;">กรอบ กสทช.</div>
+      <div style="color:var(--text-dim); font-size:0.85em;">1 — Identify<br>1.3 VA & Pen Test</div>
+    </div>
+    <div style="font-size:1em; color:var(--cyan);">→</div>
+    <div style="background:linear-gradient(135deg,rgba(0,229,204,0.1),rgba(26,111,255,0.15)); border:1px solid var(--cyan); border-radius:10px; padding:14px 20px; text-align:center; font-size:0.45em;" class="pulse">
+      <div style="color:var(--cyan); font-weight:700;">Project Horizon</div>
+      <div style="color:var(--text-dim); font-size:0.85em;">เครื่องมือที่ตอบสนอง<br>ข้อกำหนดนี้โดยตรง</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 05 — System Architecture                 -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="s-arch">
+  <span class="slide-label">05 / Architecture</span>
+  <h2>System Architecture</h2>
+  <div class="divider"></div>
+
+  <div class="arch-diagram" id="arch-anim" style="flex-wrap:wrap; gap:12px;">
+    <!-- GUI -->
+    <div class="arch-box" id="arch-gui">
+      <h4>🖥 PyQt6 GUI</h4>
+      <p>Target URL<br>Module Selection<br>Auth / Brute Force<br>Real-time Log</p>
+    </div>
+
+    <div class="arch-arrow" id="arr1">→</div>
+
+    <!-- Backend -->
+    <div class="arch-box" id="arch-backend">
+      <h4>⚙ Go Backend<br><small style="color:var(--text-dim);font-size:0.85em;">:5500</small></h4>
+      <p>Gin Framework<br>API Handler<br>Scanner Engine<br>BFS Crawler</p>
+    </div>
+
+    <div class="arch-arrow" id="arr2">→</div>
+
+    <!-- Plugins -->
+    <div class="arch-box" id="arch-plugins">
+      <h4>🔌 9 Plugins</h4>
+      <p>Headers · Misconfig<br>TLS · XSS · SQLi<br>CMDi · CVE · BAC · ZAP</p>
+    </div>
+
+    <div class="arch-arrow" id="arr3">→</div>
+
+    <!-- Reports -->
+    <div class="arch-box" id="arch-reports">
+      <h4>📄 Reports</h4>
+      <p>JSON<br>HTML<br>PDF</p>
+    </div>
+  </div>
+
+  <!-- HTTP labels -->
+  <div style="display:flex; gap:10px; margin-top:18px; font-size:0.38em; color:var(--text-dim); justify-content:center;" class="fragment">
+    <span>POST /scan</span>
+    <span>·</span>
+    <span>GET /progress</span>
+    <span>·</span>
+    <span>GET /logs</span>
+    <span>·</span>
+    <span>POST /cancel</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 06 — Tech Stack                          -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">06 / Tech Stack</span>
+  <h2>Technology Stack</h2>
+  <div class="divider"></div>
+
+  <div class="card-grid" style="grid-template-columns:repeat(3,1fr); gap:16px; margin-top:20px;">
+    <div class="card fragment">
+      <div class="icon">🐹</div>
+      <h3>Go 1.21+</h3>
+      <p>Backend — Gin framework<br>Concurrency: goroutine + WaitGroup<br>10-worker plugin pool</p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">🐍</div>
+      <h3>Python + PyQt6</h3>
+      <p>Desktop GUI<br>QThread background worker<br>Real-time log streaming</p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">🌐</div>
+      <h3>golang.org/x/net</h3>
+      <p>HTML Parser (html.Node)<br>HTTP/2, HTTP/3<br>CSRF token detection</p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">🔒</div>
+      <h3>crypto/tls</h3>
+      <p>Raw TLS inspection<br>Certificate chain analysis<br>Version negotiation check</p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">📄</div>
+      <h3>go-pdf/fpdf</h3>
+      <p>PDF report generation<br>Professional security assessment<br>CVSS score table</p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">🕷</div>
+      <h3>OWASP ZAP</h3>
+      <p>Active scan integration<br>AJAX Spider (SPA support)<br>REST API connector</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 07 — Scanner Modules Overview            -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="s-plugins">
+  <span class="slide-label">07 / Modules</span>
+  <h2>Scanner Modules — 9 Plugins</h2>
+  <div class="divider"></div>
+
+  <div class="plugin-grid" id="plugin-grid">
+    <div class="plugin-card" data-delay="0">
+      <div class="p-icon">🛡</div>
+      <div class="p-name">HeaderScanner</div>
+      <div class="p-owasp">A06 · 9 checks</div>
+    </div>
+    <div class="plugin-card" data-delay="100">
+      <div class="p-icon">⚙</div>
+      <div class="p-name">MisconfigScanner</div>
+      <div class="p-owasp">A02 · 3 methods</div>
+    </div>
+    <div class="plugin-card" data-delay="200">
+      <div class="p-icon">🔐</div>
+      <div class="p-name">TLSScanner</div>
+      <div class="p-owasp">A04 · cert + version</div>
+    </div>
+    <div class="plugin-card" data-delay="300">
+      <div class="p-icon">💉</div>
+      <div class="p-name">XSSScanner</div>
+      <div class="p-owasp">A05 · 8 payloads</div>
+    </div>
+    <div class="plugin-card" data-delay="400">
+      <div class="p-icon">🗄</div>
+      <div class="p-name">SQLiScanner</div>
+      <div class="p-owasp">A05 · 3-phase</div>
+    </div>
+    <div class="plugin-card" data-delay="500">
+      <div class="p-icon">📦</div>
+      <div class="p-name">CVEScanner</div>
+      <div class="p-owasp">A03 · 25+ signatures</div>
+    </div>
+    <div class="plugin-card" data-delay="600">
+      <div class="p-icon">🚪</div>
+      <div class="p-name">BACScanner</div>
+      <div class="p-owasp">A01 · 6 checks</div>
+    </div>
+    <div class="plugin-card" data-delay="700">
+      <div class="p-icon">💻</div>
+      <div class="p-name">CMDiScanner</div>
+      <div class="p-owasp">A05 · time + output</div>
+    </div>
+    <div class="plugin-card" data-delay="800">
+      <div class="p-icon">🕷</div>
+      <div class="p-name">ZAPScanner</div>
+      <div class="p-owasp">A01–A07 · full active</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 08 — XSS Detection Algorithm            -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">08 / XSS Detection</span>
+  <h2>XSSScanner — Nonce-Based Reflection Probing</h2>
+  <div class="divider"></div>
+
+  <div class="two-col" style="align-items:start; gap:32px;">
+    <div>
+      <p style="font-size:0.62em; color:var(--text-dim); margin-bottom:12px;">Algorithm:</p>
+      <ol style="font-size:0.65em; line-height:2.1; padding-left:1.4em;">
+        <li class="fragment">สร้าง random <strong style="color:var(--cyan);">8-char hex nonce</strong> ต่อ URL</li>
+        <li class="fragment">Inject payload ใน query parameters</li>
+        <li class="fragment">ค้นหา nonce กลับมาใน response body</li>
+        <li class="fragment">พบ nonce → <span style="color:var(--cyan);">Reflected XSS Confirmed</span></li>
+      </ol>
+    </div>
+    <div>
+      <p style="font-size:0.62em; color:var(--text-dim); margin-bottom:8px;">Payload Templates (8 รูปแบบ):</p>
+      <div style="background:var(--bg3); border-radius:10px; padding:18px; font-size:0.52em; font-family:monospace; color:var(--cyan); line-height:2.4; border:1px solid var(--border);">
+        <div class="fragment">&lt;script&gt;/*NONCE*/&lt;/script&gt;</div>
+        <div class="fragment">"&gt;&lt;img src=x onerror=/*NONCE*/&gt;</div>
+        <div class="fragment">"&gt;&lt;svg onload=/*NONCE*/&gt;</div>
+        <div class="fragment">&lt;input onfocus=/*NONCE*/ autofocus&gt;</div>
+        <div class="fragment" style="color:var(--text-dim);">... + 4 more contexts</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fragment" style="margin-top:20px; width:100%;">
+    <span class="badge badge-medium">CWE-79</span>
+    <span class="badge badge-medium" style="margin-left:8px;">A05:2025-Injection</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 09 — SQLi 3-Phase                       -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="s-sqli">
+  <span class="slide-label">09 / SQLi Detection</span>
+  <h2>SQLiScanner — 3-Phase Detection</h2>
+  <div class="divider"></div>
+
+  <div class="phase-list" id="phase-list">
+    <div class="phase-item" data-width="95" data-delay="0">
+      <div class="phase-num">1</div>
+      <div class="phase-bar-wrap">
+        <strong style="font-size:0.52em; color:var(--text);">Error-Based</strong>
+        <p>Inject <code style="color:var(--cyan);">'</code>, <code style="color:var(--cyan);">''</code>, <code style="color:var(--cyan);">' OR ''='</code> → ตรวจหา SQL error regex ใน response</p>
+        <div class="phase-track"><div class="phase-fill"></div></div>
+      </div>
+      <div class="phase-speed">~3 requests · เร็วที่สุด</div>
+    </div>
+
+    <div class="phase-item" data-width="68" data-delay="300">
+      <div class="phase-num">2</div>
+      <div class="phase-bar-wrap">
+        <strong style="font-size:0.52em; color:var(--text);">Boolean-Based Blind</strong>
+        <p>เปรียบเทียบ body size ระหว่าง <code style="color:var(--cyan);">1=1</code> และ <code style="color:var(--cyan);">1=2</code> (diff &gt; 10%)</p>
+        <div class="phase-track"><div class="phase-fill"></div></div>
+      </div>
+      <div class="phase-speed">~4 requests · ปานกลาง</div>
+    </div>
+
+    <div class="phase-item" data-width="38" data-delay="600">
+      <div class="phase-num">3</div>
+      <div class="phase-bar-wrap">
+        <strong style="font-size:0.52em; color:var(--text);">Time-Based Blind</strong>
+        <p>SLEEP(3), pg_sleep(3), WAITFOR DELAY → response time ≥ baseline + 2000ms</p>
+        <div class="phase-track"><div class="phase-fill"></div></div>
+      </div>
+      <div class="phase-speed">~40s max · ช้าที่สุด</div>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:10px; margin-top:16px;" class="fragment">
+    <span class="badge badge-high">CWE-89</span>
+    <span class="badge badge-high">A05:2025-Injection</span>
+    <span class="badge badge-medium" style="margin-left:8px;">MySQL · PostgreSQL · MSSQL</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 10 — BACScanner                         -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">10 / BAC</span>
+  <h2>BACScanner — Broken Access Control</h2>
+  <div class="divider"></div>
+
+  <div class="card-grid" style="grid-template-columns:repeat(3,1fr); gap:14px; margin-top:16px;">
+    <div class="card fragment">
+      <div class="icon">🔒</div>
+      <h3>CSRF Detection</h3>
+      <p>ตรวจหา POST form ที่ไม่มี hidden CSRF token<br><span style="color:var(--warn);">High — CWE-352</span></p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">📁</div>
+      <h3>Sensitive Path Probe</h3>
+      <p>/.env, /.git/config, /admin, /backup.zip<br>15 paths<br><span style="color:var(--danger);">Critical — CWE-538</span></p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">↩</div>
+      <h3>Open Redirect</h3>
+      <p>Inject external URL ใน redirect params<br><span style="color:var(--blue);">Medium — CWE-601</span></p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">📂</div>
+      <h3>Directory Listing</h3>
+      <p>ตรวจหา "Index of /" ใน response body<br><span style="color:var(--blue);">Medium — CWE-548</span></p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">🍪</div>
+      <h3>Cookie SameSite</h3>
+      <p>ตรวจ Set-Cookie ที่ขาด SameSite attribute<br><span style="color:var(--cyan);">Low — CWE-1275</span></p>
+    </div>
+    <div class="card fragment">
+      <div class="icon">💬</div>
+      <h3>Sensitive Comments</h3>
+      <p>HTML comment ที่มีคำว่า password, token, secret<br><span style="color:var(--cyan);">Low — CWE-615</span></p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 11 — OWASP Coverage Matrix              -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="s-owasp">
+  <span class="slide-label">11 / OWASP Coverage</span>
+  <h2>OWASP Top 10:2025 — Coverage Matrix</h2>
+  <div class="divider"></div>
+
+  <div class="owasp-grid" id="owasp-grid">
+    <div class="owasp-cell covered" data-delay="0">
+      <div class="owasp-icon">✅</div>
+      <div class="owasp-id">A01</div>
+      <div class="owasp-label">Broken Access Control</div>
+    </div>
+    <div class="owasp-cell covered" data-delay="100">
+      <div class="owasp-icon">✅</div>
+      <div class="owasp-id">A02</div>
+      <div class="owasp-label">Security Misconfig</div>
+    </div>
+    <div class="owasp-cell covered" data-delay="200">
+      <div class="owasp-icon">✅</div>
+      <div class="owasp-id">A03</div>
+      <div class="owasp-label">Supply Chain</div>
+    </div>
+    <div class="owasp-cell covered" data-delay="300">
+      <div class="owasp-icon">✅</div>
+      <div class="owasp-id">A04</div>
+      <div class="owasp-label">Crypto Failures</div>
+    </div>
+    <div class="owasp-cell covered" data-delay="400">
+      <div class="owasp-icon">✅</div>
+      <div class="owasp-id">A05</div>
+      <div class="owasp-label">Injection</div>
+    </div>
+    <div class="owasp-cell covered" data-delay="500">
+      <div class="owasp-icon">✅</div>
+      <div class="owasp-id">A06</div>
+      <div class="owasp-label">Insecure Design</div>
+    </div>
+    <div class="owasp-cell covered" data-delay="600">
+      <div class="owasp-icon">✅</div>
+      <div class="owasp-id">A07</div>
+      <div class="owasp-label">Auth Failures</div>
+    </div>
+    <div class="owasp-cell none" data-delay="700">
+      <div class="owasp-icon">⚪</div>
+      <div class="owasp-id">A08</div>
+      <div class="owasp-label">SW Integrity</div>
+    </div>
+    <div class="owasp-cell none" data-delay="800">
+      <div class="owasp-icon">⚪</div>
+      <div class="owasp-id">A09</div>
+      <div class="owasp-label">Logging Failures</div>
+    </div>
+    <div class="owasp-cell none" data-delay="900">
+      <div class="owasp-icon">⚪</div>
+      <div class="owasp-id">A10</div>
+      <div class="owasp-label">SSRF</div>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:20px; margin-top:20px; justify-content:center; font-size:0.4em;" class="fragment">
+    <span style="color:var(--cyan);">✅ ครอบคลุม 7/10 หมวด (70%)</span>
+    <span style="color:var(--text-dim);">⚪ A08–A10: ZAP indirect coverage</span>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 12 — Auth & Brute Force                 -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">12 / Auth & BruteForce</span>
+  <h2>Authentication + Brute Force</h2>
+  <div class="divider"></div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:40px; width:100%; align-items:start;">
+    <div style="background:var(--card-bg); border:1px solid var(--border); border-radius:14px; padding:24px 28px;">
+      <h3 style="color:var(--cyan); font-size:1em; margin:0 0 18px;">🔑 Form-Based Login</h3>
+      <ul style="font-size:0.82em; line-height:2.3; padding-left:1.2em; margin:0;">
+        <li class="fragment">Auto-detect username/password fields จาก HTML</li>
+        <li class="fragment">ดึง hidden fields (CSRF tokens) อัตโนมัติ</li>
+        <li class="fragment">Session cookies ส่งต่อทุก request</li>
+        <li class="fragment">ใช้ <code style="color:var(--cyan);">x/net/html</code> parse form</li>
+      </ul>
+    </div>
+    <div style="background:var(--card-bg); border:1px solid rgba(224,123,32,0.4); border-radius:14px; padding:24px 28px;">
+      <h3 style="color:var(--warn); font-size:1em; margin:0 0 18px;">💀 Brute Force Login</h3>
+      <ul style="font-size:0.82em; line-height:2.3; padding-left:1.2em; margin:0;">
+        <li class="fragment">ทดสอบ username × password combinations</li>
+        <li class="fragment"><strong>3-signal success detection:</strong>
+          <ul style="margin-top:6px; font-size:0.88em; color:var(--text-dim); line-height:2;">
+            <li>Failure keywords ใน body</li>
+            <li>URL redirect path เปลี่ยน</li>
+            <li>Session cookie ปรากฏ</li>
+          </ul>
+        </li>
+        <li class="fragment">Safety cap: max 500 attempts, min 100ms delay</li>
+        <li class="fragment">รายงานเป็น <span class="badge badge-critical">Critical</span> A07 · CWE-307</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 13 — Scanning Modes                     -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">13 / Scan Modes</span>
+  <h2>Scanning Modes &amp; Real-Time Features</h2>
+  <div class="divider"></div>
+
+  <div class="two-col" style="gap:28px; align-items:start;">
+    <div>
+      <p style="font-size:0.5em; color:var(--text-dim); margin-bottom:8px;">Scan Modes:</p>
+      <div class="card fragment" style="margin-bottom:12px; padding:16px 18px;">
+        <h3 style="font-size:0.6em;">🟢 Normal Mode</h3>
+        <p>Max 30 pages, depth 2<br>หยุดเมื่อพบช่องโหว่แรก (เร็วที่สุด)</p>
+      </div>
+      <div class="card fragment" style="margin-bottom:12px; padding:16px 18px;">
+        <h3 style="font-size:0.6em;">🟡 Timed Mode</h3>
+        <p>ไม่จำกัด pages/depth<br>มี time limit (default 5 min)</p>
+      </div>
+      <div class="card fragment" style="padding:16px 18px;">
+        <h3 style="font-size:0.6em;">🔴 Full Scan</h3>
+        <p>ไม่จำกัดทุกอย่าง<br>XSS: ทุก payload · SQLi: ทุก 3 phase</p>
+      </div>
+    </div>
+    <div>
+      <p style="font-size:0.5em; color:var(--text-dim); margin-bottom:8px;">Real-Time API Endpoints:</p>
+      <div style="background:var(--bg3); border-radius:10px; padding:16px; font-size:0.4em; font-family:monospace; border:1px solid var(--border); line-height:2.5;">
+        <div class="fragment"><span style="color:var(--cyan);">POST</span> <span style="color:var(--text);">/scan</span> <span style="color:var(--text-dim);">— เริ่ม scan</span></div>
+        <div class="fragment"><span style="color:var(--blue);">GET</span>  <span style="color:var(--text);">/progress</span> <span style="color:var(--text-dim);">— phase, done/total, %</span></div>
+        <div class="fragment"><span style="color:var(--blue);">GET</span>  <span style="color:var(--text);">/logs</span> <span style="color:var(--text-dim);">— incremental log stream</span></div>
+        <div class="fragment"><span style="color:var(--warn);">POST</span> <span style="color:var(--text);">/cancel</span> <span style="color:var(--text-dim);">— หยุดกลางคัน</span></div>
+        <div class="fragment"><span style="color:var(--blue);">GET</span>  <span style="color:var(--text);">/health</span> <span style="color:var(--text-dim);">— backend status</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 14 — Live Demo Data                     -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="s-demo">
+  <span class="slide-label">14 / Demo Results</span>
+  <h2>ผลการสแกนจริง — zaproxy.org</h2>
+  <div class="divider"></div>
+
+  <!-- Animated counters -->
+  <div class="counter-wrap" id="counters">
+    <div class="counter-box">
+      <span class="counter-num" data-target="10" style="color:var(--cyan);">0</span>
+      <div class="counter-lbl">URLs Scanned</div>
+    </div>
+    <div class="counter-box">
+      <span class="counter-num" data-target="42" style="color:var(--text);">0</span>
+      <div class="counter-lbl">Total Findings</div>
+    </div>
+    <div class="counter-box">
+      <span class="counter-num" data-target="6" style="color:var(--warn);">0</span>
+      <div class="counter-lbl">High</div>
+    </div>
+    <div class="counter-box">
+      <span class="counter-num" data-target="15" style="color:#64b0ff;">0</span>
+      <div class="counter-lbl">Medium</div>
+    </div>
+    <div class="counter-box">
+      <span class="counter-num" data-target="21" style="color:var(--cyan);">0</span>
+      <div class="counter-lbl">Low</div>
+    </div>
+  </div>
+
+  <!-- Bar chart -->
+  <div class="bar-chart" id="bar-chart">
+    <div class="bar-row">
+      <div class="bar-label">High</div>
+      <div class="bar-track"><div class="bar-fill" data-width="14" style="background:linear-gradient(90deg,var(--warn),#ff9944);"></div></div>
+      <div class="bar-val">6</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Medium</div>
+      <div class="bar-track"><div class="bar-fill" data-width="36" style="background:linear-gradient(90deg,var(--blue),#64b0ff);"></div></div>
+      <div class="bar-val">15</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">Low</div>
+      <div class="bar-track"><div class="bar-fill" data-width="50" style="background:linear-gradient(90deg,var(--cyan),#00ffd0);"></div></div>
+      <div class="bar-val">21</div>
+    </div>
+  </div>
+
+  <!-- Top finding -->
+  <div class="fragment" style="width:100%; margin-top:12px;">
+    <table class="findings-table">
+      <thead>
+        <tr><th>Module</th><th>Finding</th><th>Severity</th><th>OWASP</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span style="color:var(--cyan);">headers</span></td>
+          <td>Missing HSTS</td>
+          <td><span class="badge badge-high">High</span></td>
+          <td>A06:2025</td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--cyan);">headers</span></td>
+          <td>Missing Content-Security-Policy</td>
+          <td><span class="badge badge-medium">Medium</span></td>
+          <td>A06:2025</td>
+        </tr>
+        <tr>
+          <td><span style="color:var(--cyan);">headers</span></td>
+          <td>Missing Referrer-Policy</td>
+          <td><span class="badge badge-low">Low</span></td>
+          <td>A06:2025</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 15 — Reports                            -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">15 / Reports</span>
+  <h2>Report Generation</h2>
+  <div class="divider"></div>
+
+  <div class="card-grid" style="grid-template-columns:repeat(3,1fr); gap:20px; margin-top:20px;">
+    <div class="card fragment" style="border-color:rgba(0,229,204,0.5);">
+      <div class="icon">📋</div>
+      <h3>JSON Report</h3>
+      <p>Structured findings export<br>Machine-readable<br>Integration-ready<br>พร้อม CVSS, CWE, HTTP dump</p>
+    </div>
+    <div class="card fragment" style="border-color:rgba(26,111,255,0.5);">
+      <div class="icon">🌐</div>
+      <h3>HTML Report</h3>
+      <p>Interactive vulnerability report<br>Dark theme<br>Severity color coding<br>Filterable findings</p>
+    </div>
+    <div class="card fragment" style="border-color:rgba(167,139,250,0.5);">
+      <div class="icon">📄</div>
+      <h3>PDF Report</h3>
+      <p>Professional assessment document<br>go-pdf/fpdf<br>Exec Summary + Methodology<br>Conclusions + Evidence</p>
+    </div>
+  </div>
+
+  <div class="fragment" style="margin-top:24px; font-size:0.48em; color:var(--text-dim); text-align:center;">
+    ทุกรูปแบบมี: <strong style="color:var(--cyan);">Executive Summary · Methodology · Summary Table · Detailed Findings · Risk Rating · Conclusions</strong>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 16 — Limitations                        -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">16 / Limitations</span>
+  <h2>Limitations &amp; Future Work</h2>
+  <div class="divider"></div>
+
+  <div class="two-col" style="gap:20px; align-items:start;">
+    <div>
+      <p style="font-size:0.5em; color:var(--text-dim); margin-bottom:10px;">ข้อจำกัดปัจจุบัน:</p>
+      <div class="limit-card fragment" style="margin-bottom:12px;">
+        <h4>A08–A10 ไม่ครอบคลุมโดยตรง</h4>
+        <p>Software Integrity, Logging Failures, SSRF ยังต้องพึ่ง ZAP integration</p>
+      </div>
+      <div class="limit-card fragment" style="margin-bottom:12px;">
+        <h4>Banner-Based CVE Detection</h4>
+        <p>ตรวจจากชื่อ/version ใน header เท่านั้น ไม่ได้ query NVD database จริง</p>
+      </div>
+      <div class="limit-card fragment">
+        <h4>ไม่รองรับ CAPTCHA / MFA</h4>
+        <p>Brute Force module ไม่สามารถ bypass CAPTCHA หรือ 2FA ได้</p>
+      </div>
+    </div>
+    <div>
+      <p style="font-size:0.65em; color:var(--text-dim); margin-bottom:12px;">แนวทางพัฒนาต่อ:</p>
+      <ul style="font-size:0.68em; line-height:2.2;">
+        <li class="fragment">🤖 ML-based payload generation</li>
+        <li class="fragment">🔗 GraphQL / REST API scanning</li>
+        <li class="fragment">📡 NVD database integration (CVE)</li>
+        <li class="fragment">🌐 SPA/JavaScript-heavy site support</li>
+        <li class="fragment">☁ Cloud deployment (SaaS model)</li>
+        <li class="fragment">📊 Trend tracking across multiple scans</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 17 — Summary                            -->
+<!-- ═══════════════════════════════════════════════ -->
+<section>
+  <span class="slide-label">17 / Summary</span>
+  <h2>สรุป</h2>
+  <div class="divider"></div>
+
+  <div class="stat-row" style="margin-bottom:24px;">
+    <div class="stat-box total fragment"><span class="num">9</span><span class="lbl">Scanner Plugins</span></div>
+    <div class="stat-box fragment" style="border-color:var(--cyan);"><span class="num" style="color:var(--cyan);">7/10</span><span class="lbl">OWASP Coverage</span></div>
+    <div class="stat-box fragment" style="border-color:var(--blue);"><span class="num" style="color:#64b0ff;">65+</span><span class="lbl">Security Checks</span></div>
+    <div class="stat-box fragment" style="border-color:#a78bfa;"><span class="num" style="color:#a78bfa;">3</span><span class="lbl">Report Formats</span></div>
+  </div>
+
+  <ul style="font-size:0.55em; line-height:2; text-align:left;" class="fragment">
+    <li>ระบบพัฒนาด้วย <strong>Go backend + PyQt6 GUI</strong> แบบ Client-Server</li>
+    <li>ครอบคลุม <strong>OWASP Top 10:2025</strong> จำนวน <strong>7 หมวด (70%)</strong></li>
+    <li>สนับสนุนการปฏิบัติตาม <strong>ประมวลแนวปฏิบัติ กสทช. 2565</strong> หมวด 1.3</li>
+    <li>มีฟีเจอร์ <strong>Authentication + Brute Force</strong> พร้อม 3-signal detection</li>
+    <li>รองรับ <strong>OWASP ZAP Integration</strong> สำหรับ Active Scan ขั้นสูง</li>
+  </ul>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 18 — Q&A                                -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="s-qa">
+  <div class="qa-box">
+    <h1>Q &amp; A</h1>
+    <div class="divider" style="margin:16px auto;"></div>
+    <p style="font-size:0.6em; margin-bottom:8px;">Project Horizon — VA Scanner</p>
+    <p style="color:var(--text-dim);">ภูมินทร์ ทองลา &nbsp;|&nbsp; ปีการศึกษา 2568</p>
+    <div class="cover-tags" style="margin-top:24px;">
+      <span class="cover-tag">github.com/Natsu2022/Project-Horizon</span>
+    </div>
+
+    <!-- Scan animation loop -->
+    <div style="margin-top:28px; position:relative; width:160px; height:160px; margin-left:auto; margin-right:auto;">
+      <svg viewBox="0 0 160 160" style="width:160px;height:160px;">
+        <circle cx="80" cy="80" r="70" fill="none" stroke="rgba(0,229,204,0.1)" stroke-width="1"/>
+        <circle cx="80" cy="80" r="50" fill="none" stroke="rgba(0,229,204,0.15)" stroke-width="1"/>
+        <circle cx="80" cy="80" r="30" fill="none" stroke="rgba(0,229,204,0.2)" stroke-width="1"/>
+        <circle cx="80" cy="80" r="8" fill="var(--cyan)" opacity="0.8"/>
+        <!-- scanning line -->
+        <line x1="80" y1="80" x2="150" y2="80" stroke="rgba(0,229,204,0.6)" stroke-width="1.5">
+          <animateTransform attributeName="transform" type="rotate" from="0 80 80" to="360 80 80" dur="3s" repeatCount="indefinite"/>
+        </line>
+        <!-- dots -->
+        <circle cx="80" cy="10" r="3" fill="var(--cyan)" opacity="0.5"/>
+        <circle cx="150" cy="80" r="3" fill="var(--cyan)" opacity="0.5"/>
+        <circle cx="80" cy="150" r="3" fill="var(--cyan)" opacity="0.5"/>
+        <circle cx="10"  cy="80" r="3" fill="var(--cyan)" opacity="0.5"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+</div><!-- .slides -->
+</div><!-- .reveal -->
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SCRIPTS                                        -->
+<!-- ═══════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+/* ── Star field ── */
+(function(){
+  const canvas = document.getElementById('stars-canvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+
+  function resize(){
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  function initStars(){
+    stars = [];
+    for(let i=0; i<200; i++){
+      stars.push({
+        x: Math.random()*canvas.width,
+        y: Math.random()*canvas.height,
+        r: Math.random()*1.5+0.3,
+        a: Math.random(),
+        da: (Math.random()-0.5)*0.005
+      });
+    }
+  }
+
+  function drawStars(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    stars.forEach(s=>{
+      s.a += s.da;
+      if(s.a<=0||s.a>=1) s.da=-s.da;
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,255,${s.a*0.7})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(drawStars);
+  }
+
+  window.addEventListener('resize', ()=>{ resize(); initStars(); });
+  resize(); initStars(); drawStars();
+})();
+
+/* ── Reveal.js init ── */
+Reveal.initialize({
+  hash: true,
+  slideNumber: 'c/t',
+  transition: 'slide',
+  transitionSpeed: 'default',
+  backgroundTransition: 'fade',
+  controls: true,
+  progress: true,
+  center: false,
+  width: 1280,
+  height: 720,
+  margin: 0.06,
+  plugins: []
+});
+
+/* ── Slide event handlers ── */
+Reveal.on('slidechanged', e => {
+  const id = e.currentSlide.id;
+
+  /* Architecture animation */
+  if(id === 's-arch'){
+    setTimeout(()=>{
+      document.getElementById('arch-gui').classList.add('glow');
+      setTimeout(()=>{
+        document.getElementById('arr1').classList.add('show');
+        document.getElementById('arch-backend').classList.add('glow');
+        setTimeout(()=>{
+          document.getElementById('arr2').classList.add('show');
+          document.getElementById('arch-plugins').classList.add('glow');
+          setTimeout(()=>{
+            document.getElementById('arr3').classList.add('show');
+            document.getElementById('arch-reports').classList.add('glow');
+          },500);
+        },500);
+      },500);
+    },400);
+  } else {
+    /* reset arch */
+    ['arch-gui','arch-backend','arch-plugins','arch-reports'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.classList.remove('glow');
+    });
+    ['arr1','arr2','arr3'].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.classList.remove('show');
+    });
+  }
+
+  /* Plugin cards pop-in */
+  if(id === 's-plugins'){
+    document.querySelectorAll('.plugin-card').forEach(card=>{
+      const delay = parseInt(card.dataset.delay||0);
+      setTimeout(()=> card.classList.add('show'), delay + 200);
+    });
+  } else {
+    document.querySelectorAll('.plugin-card').forEach(c=>c.classList.remove('show'));
+  }
+
+  /* SQLi phase bars */
+  if(id === 's-sqli'){
+    document.querySelectorAll('.phase-item').forEach((item,i)=>{
+      const delay = parseInt(item.dataset.delay||0);
+      setTimeout(()=>{
+        item.classList.add('show');
+        const fill = item.querySelector('.phase-fill');
+        const w = item.dataset.width || 50;
+        setTimeout(()=>{ fill.style.width = w+'%'; }, 100);
+      }, delay + 300);
+    });
+  } else {
+    document.querySelectorAll('.phase-item').forEach(el=>{
+      el.classList.remove('show');
+      const fill = el.querySelector('.phase-fill');
+      if(fill) fill.style.width = '0';
+    });
+  }
+
+  /* OWASP matrix */
+  if(id === 's-owasp'){
+    document.querySelectorAll('.owasp-cell').forEach(cell=>{
+      const delay = parseInt(cell.dataset.delay||0);
+      setTimeout(()=>{ cell.style.opacity='1'; }, delay + 200);
+    });
+  } else {
+    document.querySelectorAll('.owasp-cell').forEach(c=>c.style.opacity='0');
+  }
+
+  /* Demo counters & bars */
+  if(id === 's-demo'){
+    /* counters */
+    document.querySelectorAll('.counter-num').forEach(el=>{
+      const target = parseInt(el.dataset.target||0);
+      let curr = 0;
+      const step = Math.max(1, Math.floor(target/40));
+      const timer = setInterval(()=>{
+        curr = Math.min(curr+step, target);
+        el.textContent = curr;
+        if(curr >= target) clearInterval(timer);
+      }, 40);
+    });
+    /* bars */
+    setTimeout(()=>{
+      document.querySelectorAll('.bar-fill').forEach(bar=>{
+        bar.style.width = bar.dataset.width + '%';
+      });
+    }, 300);
+  } else {
+    document.querySelectorAll('.counter-num').forEach(el=>{ el.textContent='0'; });
+    document.querySelectorAll('.bar-fill').forEach(bar=>{ bar.style.width='0'; });
+  }
+});
+</script>
+</body>
+</html>

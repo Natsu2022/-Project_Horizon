@@ -284,8 +284,12 @@ func (b *BACScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 
 	for i := range findings {
 		findings[i].ID = buildID("BAC", u.URL, i)
-		findings[i].Request = reqDump
-		findings[i].Response = respDump
+		if findings[i].Request == "" {
+			findings[i].Request = reqDump
+		}
+		if findings[i].Response == "" {
+			findings[i].Response = respDump
+		}
 	}
 	return findings
 }
@@ -346,6 +350,10 @@ func (b *BACScanner) probePath(ctx context.Context, baseURL string, sp sensitive
 
 	if resp.StatusCode != 200 {
 		return nil
+	}
+	ct := resp.Header.Get("Content-Type")
+	if strings.Contains(ct, "text/html") {
+		return nil // SPA catch-all or custom 404 served as HTML — not a real file
 	}
 
 	f := model.NewFinding("bac", "forced_browsing",

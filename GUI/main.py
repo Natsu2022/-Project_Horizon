@@ -35,6 +35,7 @@ Key widgets (built in ScannerGUI):
 import json
 import os
 import platform
+import re
 import socket
 import subprocess
 import sys
@@ -42,28 +43,42 @@ import time
 import urllib.request
 from datetime import datetime
 
+# Minimum password length enforced on both GUI and backend (NIST SP 800-63B / OWASP ASVS §2.1.1)
+AUTH_MIN_PASSWORD_LEN = 8
+
+# Regex patterns for credential type detection
+_EMAIL_RE    = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
+_USERNAME_RE = re.compile(r'^[a-zA-Z0-9._\-]{3,}$')
+
 import psutil
 
-from PyQt6.QtCore import QObject, Qt, QThread, QTimer, pyqtSignal
-from PyQt6.QtGui import QCloseEvent
+import html as _html
+
+from PyQt6.QtCore import QEasingCurve, QObject, QPropertyAnimation, Qt, QThread, QTimer, pyqtSignal
+from PyQt6.QtGui import QCloseEvent, QTextCursor
 from PyQt6.QtWidgets import (
     QApplication,
     QButtonGroup,
     QCheckBox,
+    QFileDialog,
+    QFrame,
     QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPlainTextEdit,
     QProgressBar,
     QPushButton,
     QRadioButton,
+    QScrollArea,
     QSpinBox,
+    QSplitter,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
-from api_client import health_check, progress_check, start_scan_with_session
+from api_client import cancel_scan, health_check, logs_check, progress_check, start_scan_with_session
 
 
 def _find_zap_executable():
@@ -230,6 +245,12 @@ class ScanWorker(QObject):
 
     def cancel(self):
         self._cancelled = True
+        # Tell the backend to stop immediately via POST /cancel.
+        # This is the primary cancellation path — it cancels the Go context
+        # directly, which stops all in-flight HTTP requests inside the engine.
+        cancel_scan()
+        # Close the session as a secondary measure so the blocked session.post()
+        # in run() raises an exception and the worker thread can exit.
         if self._session is not None:
             self._session.close()
 
@@ -359,18 +380,25 @@ class ScannerGUI(QWidget):
         super().__init__()
 
         self.setWindowTitle("VA Scanner - Thesis Starter")
-        self.resize(1040, 760)
+        self.resize(1100, 760)
 
         self.scan_thread = None
         self.scan_worker = None
         self.scan_running = False
+        self._log_index = 0       # tracks how many backend log lines have been displayed
+        self._scroll_anim = None  # QPropertyAnimation reused for smooth scrolling
 
         self._report_btns = []
 
         root = QVBoxLayout()
 
         self._build_dashboard(root)
-        self._build_scan_controls(root)
+
+        # ── Left panel: scan controls + progress bar ──────────────────────────
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        left_layout.setContentsMargins(0, 0, 4, 0)
+        self._build_scan_controls(left_layout)
 
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
@@ -392,14 +420,61 @@ class ScannerGUI(QWidget):
                 border-radius: 3px;
             }
         """)
-        root.addWidget(self.progress)
+        left_layout.addWidget(self.progress)
+        left_layout.addStretch()
 
+        left_scroll = QScrollArea()
+        left_scroll.setWidget(left_widget)
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        left_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        left_scroll.setMinimumWidth(380)
+
+        # ── Right panel: log output + report buttons ──────────────────────────
         self.output = QTextEdit()
         self.output.setReadOnly(True)
-        root.addWidget(self.output)
+        self.output.setStyleSheet("""
+            QTextEdit {
+                background-color: #1e1e1e;
+                color: #cfd8dc;
+                font-family: 'Consolas', 'Courier New', monospace;
+                font-size: 12px;
+                border: 1px solid #444;
+                border-radius: 4px;
+                padding: 4px;
+            }
+            QScrollBar:vertical {
+                background: #2b2b2b;
+                width: 8px;
+                border-radius: 4px;
+            }
+            QScrollBar::handle:vertical {
+                background: #555;
+                border-radius: 4px;
+                min-height: 20px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #e07b20;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+        """)
 
         self._report_btn_row = QHBoxLayout()
-        root.addLayout(self._report_btn_row)
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        right_layout.setContentsMargins(4, 0, 0, 0)
+        right_layout.addWidget(self.output)
+        right_layout.addLayout(self._report_btn_row)
+
+        # ── Horizontal splitter ───────────────────────────────────────────────
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.addWidget(left_scroll)
+        splitter.addWidget(right_widget)
+        splitter.setSizes([440, 580])
+        splitter.setChildrenCollapsible(False)
+        root.addWidget(splitter, 1)
 
         self.status_bar = QLabel("Ready")
         self.status_bar.setStyleSheet("padding: 6px; border-top: 1px solid #444;")
@@ -513,6 +588,8 @@ class ScannerGUI(QWidget):
         self.opt_cve.setChecked(True)
         self.opt_bac = QCheckBox("Broken Access Control")
         self.opt_bac.setChecked(True)
+        self.opt_cmdi = QCheckBox("CMD Injection")
+        self.opt_cmdi.setChecked(False)  # off by default — sends real OS commands to the target
 
         module_layout.addWidget(QLabel("Modules"), 0, 0)
         module_layout.addWidget(self.opt_headers, 1, 0)
@@ -522,6 +599,7 @@ class ScannerGUI(QWidget):
         module_layout.addWidget(self.opt_sqli, 2, 1)
         module_layout.addWidget(self.opt_cve, 2, 2)
         module_layout.addWidget(self.opt_bac, 3, 0, 1, 2)
+        module_layout.addWidget(self.opt_cmdi, 3, 2)
         root.addLayout(module_layout)
 
         zap_layout = QHBoxLayout()
@@ -536,6 +614,167 @@ class ScannerGUI(QWidget):
         zap_layout.addWidget(self.zap_key)
         zap_layout.addStretch()
         root.addLayout(zap_layout)
+
+        # ── Authentication section ────────────────────────────────────────────
+        auth_header = QHBoxLayout()
+        self.opt_auth = QCheckBox("Authentication")
+        self.opt_auth.setChecked(False)
+        self.opt_auth.stateChanged.connect(self._toggle_auth_fields)
+        auth_header.addWidget(self.opt_auth)
+        auth_header.addStretch()
+        root.addLayout(auth_header)
+
+        auth_grid = QGridLayout()
+        auth_grid.setContentsMargins(20, 0, 0, 4)
+
+        # Row 0 — Login URL (spans all columns)
+        auth_grid.addWidget(QLabel("Login URL"), 0, 0)
+        self.auth_login_url = QLineEdit()
+        self.auth_login_url.setPlaceholderText("https://target.example/login")
+        auth_grid.addWidget(self.auth_login_url, 0, 1, 1, 4)
+
+        # Row 1 — Username/Email field name + value + type indicator
+        auth_grid.addWidget(QLabel("Credential Field"), 1, 0)
+        self.auth_username_field = QLineEdit()
+        self.auth_username_field.setPlaceholderText("username")
+        auth_grid.addWidget(self.auth_username_field, 1, 1)
+
+        auth_grid.addWidget(QLabel("Value"), 1, 2)
+        self.auth_username_val = QLineEdit()
+        self.auth_username_val.setPlaceholderText("Email or Username")
+        self.auth_username_val.textChanged.connect(self._detect_credential_type)
+        auth_grid.addWidget(self.auth_username_val, 1, 3)
+
+        self.auth_cred_hint = QLabel("")
+        self.auth_cred_hint.setMinimumWidth(80)
+        self.auth_cred_hint.setStyleSheet("font-size: 11px;")
+        auth_grid.addWidget(self.auth_cred_hint, 1, 4)
+
+        # Row 2 — Password field name + value + length indicator
+        auth_grid.addWidget(QLabel("Password Field"), 2, 0)
+        self.auth_password_field = QLineEdit()
+        self.auth_password_field.setPlaceholderText("password")
+        auth_grid.addWidget(self.auth_password_field, 2, 1)
+
+        auth_grid.addWidget(QLabel("Value"), 2, 2)
+        self.auth_password_val = QLineEdit()
+        self.auth_password_val.setEchoMode(QLineEdit.EchoMode.Password)
+        self.auth_password_val.setPlaceholderText(f"Min {AUTH_MIN_PASSWORD_LEN} characters")
+        self.auth_password_val.textChanged.connect(self._check_password_strength)
+        auth_grid.addWidget(self.auth_password_val, 2, 3)
+
+        self.auth_pass_hint = QLabel("")
+        self.auth_pass_hint.setMinimumWidth(80)
+        self.auth_pass_hint.setStyleSheet("font-size: 11px;")
+        auth_grid.addWidget(self.auth_pass_hint, 2, 4)
+
+        root.addLayout(auth_grid)
+
+        # Collect auth widgets for bulk enable/disable
+        self._auth_widgets = [
+            self.auth_login_url,
+            self.auth_username_field, self.auth_username_val,
+            self.auth_password_field, self.auth_password_val,
+        ]
+        for w in self._auth_widgets:
+            w.setEnabled(False)
+
+        # ── Brute Force section ───────────────────────────────────────────────
+        bf_header = QHBoxLayout()
+        self.opt_bruteforce = QCheckBox("Brute Force Login")
+        self.opt_bruteforce.setChecked(False)
+        self.opt_bruteforce.stateChanged.connect(self._toggle_bruteforce_fields)
+        bf_header.addWidget(self.opt_bruteforce)
+        bf_header.addStretch()
+        root.addLayout(bf_header)
+
+        bf_grid = QGridLayout()
+        bf_grid.setContentsMargins(20, 0, 0, 4)
+
+        # Row 0 — Login URL (shared with auth if empty)
+        bf_grid.addWidget(QLabel("Login URL"), 0, 0)
+        self.bf_login_url = QLineEdit()
+        self.bf_login_url.setPlaceholderText("https://target.example/login  (uses Auth Login URL if empty)")
+        bf_grid.addWidget(self.bf_login_url, 0, 1, 1, 3)
+
+        # Row 1 — Usernames list
+        bf_grid.addWidget(QLabel("Usernames"), 1, 0, Qt.AlignmentFlag.AlignTop)
+        self.bf_usernames = QPlainTextEdit()
+        self.bf_usernames.setPlaceholderText("One username or email per line\nadmin\nuser@example.com")
+        self.bf_usernames.setFixedHeight(72)
+        bf_grid.addWidget(self.bf_usernames, 1, 1, 1, 2)
+        # Common + Upload buttons stacked vertically in col 3
+        users_btn_col = QVBoxLayout()
+        users_btn_col.setSpacing(4)
+        self.bf_load_users_btn = QPushButton("Common")
+        self.bf_load_users_btn.setFixedWidth(70)
+        self.bf_load_users_btn.setToolTip("Load common username list")
+        self.bf_load_users_btn.clicked.connect(self._load_common_usernames)
+        self.bf_upload_users_btn = QPushButton("Upload")
+        self.bf_upload_users_btn.setFixedWidth(70)
+        self.bf_upload_users_btn.setToolTip("Load usernames from .txt file")
+        self.bf_upload_users_btn.clicked.connect(self._upload_usernames)
+        users_btn_col.addWidget(self.bf_load_users_btn)
+        users_btn_col.addWidget(self.bf_upload_users_btn)
+        users_btn_col.addStretch()
+        users_btn_widget = QWidget()
+        users_btn_widget.setLayout(users_btn_col)
+        bf_grid.addWidget(users_btn_widget, 1, 3)
+
+        # Row 2 — Passwords list
+        bf_grid.addWidget(QLabel("Passwords"), 2, 0, Qt.AlignmentFlag.AlignTop)
+        self.bf_passwords = QPlainTextEdit()
+        self.bf_passwords.setPlaceholderText("One password per line\npassword\n123456")
+        self.bf_passwords.setFixedHeight(72)
+        bf_grid.addWidget(self.bf_passwords, 2, 1, 1, 2)
+        # Common + Upload buttons stacked vertically in col 3
+        pass_btn_col = QVBoxLayout()
+        pass_btn_col.setSpacing(4)
+        self.bf_load_pass_btn = QPushButton("Common")
+        self.bf_load_pass_btn.setFixedWidth(70)
+        self.bf_load_pass_btn.setToolTip("Load common password list")
+        self.bf_load_pass_btn.clicked.connect(self._load_common_passwords)
+        self.bf_upload_pass_btn = QPushButton("Upload")
+        self.bf_upload_pass_btn.setFixedWidth(70)
+        self.bf_upload_pass_btn.setToolTip("Load passwords from .txt file")
+        self.bf_upload_pass_btn.clicked.connect(self._upload_passwords)
+        pass_btn_col.addWidget(self.bf_load_pass_btn)
+        pass_btn_col.addWidget(self.bf_upload_pass_btn)
+        pass_btn_col.addStretch()
+        pass_btn_widget = QWidget()
+        pass_btn_widget.setLayout(pass_btn_col)
+        bf_grid.addWidget(pass_btn_widget, 2, 3)
+
+        # Row 3 — Delay / Max attempts / Stop on success
+        bf_grid.addWidget(QLabel("Delay"), 3, 0)
+        self.bf_delay = QSpinBox()
+        self.bf_delay.setRange(100, 5000)
+        self.bf_delay.setSingleStep(100)
+        self.bf_delay.setValue(300)
+        self.bf_delay.setSuffix(" ms")
+        bf_grid.addWidget(self.bf_delay, 3, 1)
+
+        bf_grid.addWidget(QLabel("Max Attempts"), 3, 2)
+        self.bf_max_attempts = QSpinBox()
+        self.bf_max_attempts.setRange(1, 500)
+        self.bf_max_attempts.setValue(100)
+        bf_grid.addWidget(self.bf_max_attempts, 3, 3)
+
+        # Row 4 — Stop on success + attempt count label
+        self.bf_stop_on_success = QCheckBox("Stop on first success")
+        self.bf_stop_on_success.setChecked(True)
+        bf_grid.addWidget(self.bf_stop_on_success, 4, 1, 1, 3)
+
+        root.addLayout(bf_grid)
+
+        self._bf_widgets = [
+            self.bf_login_url, self.bf_usernames, self.bf_passwords,
+            self.bf_load_users_btn, self.bf_upload_users_btn,
+            self.bf_load_pass_btn, self.bf_upload_pass_btn,
+            self.bf_delay, self.bf_max_attempts, self.bf_stop_on_success,
+        ]
+        for w in self._bf_widgets:
+            w.setEnabled(False)
 
         report_layout = QHBoxLayout()
         self.out_json = QCheckBox("JSON")
@@ -577,6 +816,145 @@ class ScannerGUI(QWidget):
         enabled = state == Qt.CheckState.Checked.value
         self.zap_key.setEnabled(enabled)
 
+    def _toggle_auth_fields(self, state):
+        """Enable/disable all auth input widgets based on the checkbox."""
+        enabled = state == Qt.CheckState.Checked.value
+        for w in self._auth_widgets:
+            w.setEnabled(enabled)
+        if not enabled:
+            self.auth_cred_hint.setText("")
+            self.auth_pass_hint.setText("")
+
+    def _detect_credential_type(self, text: str) -> None:
+        """
+        Real-time indicator: classify the entered value as Email or Username.
+
+        Rules:
+          Email    — matches RFC 5322 simplified pattern (contains @ + domain)
+          Username — alphanumeric/._- with at least 3 characters
+          Other    — shown as warning (too short or invalid format)
+        """
+        text = text.strip()
+        if not text:
+            self.auth_cred_hint.setText("")
+            return
+        if _EMAIL_RE.match(text):
+            self.auth_cred_hint.setText("📧 Email")
+            self.auth_cred_hint.setStyleSheet("color: #4fc3f7; font-size: 11px;")
+        elif _USERNAME_RE.match(text):
+            self.auth_cred_hint.setText("👤 Username")
+            self.auth_cred_hint.setStyleSheet("color: #a5d6a7; font-size: 11px;")
+        elif len(text) < 3:
+            self.auth_cred_hint.setText("⚠ Too short")
+            self.auth_cred_hint.setStyleSheet("color: #ffcc80; font-size: 11px;")
+        else:
+            self.auth_cred_hint.setText("⚠ Invalid format")
+            self.auth_cred_hint.setStyleSheet("color: #ef9a9a; font-size: 11px;")
+
+    def _check_password_strength(self, text: str) -> None:
+        """
+        Real-time indicator: show current length vs AUTH_MIN_PASSWORD_LEN.
+
+        Green  — length >= AUTH_MIN_PASSWORD_LEN (meets requirement)
+        Red    — length < AUTH_MIN_PASSWORD_LEN  (too short)
+        """
+        n = len(text)
+        if n == 0:
+            self.auth_pass_hint.setText("")
+            return
+        if n < AUTH_MIN_PASSWORD_LEN:
+            self.auth_pass_hint.setText(f"{n}/{AUTH_MIN_PASSWORD_LEN} too short")
+            self.auth_pass_hint.setStyleSheet("color: #ef9a9a; font-size: 11px;")
+        else:
+            self.auth_pass_hint.setText(f"✓ {n} chars")
+            self.auth_pass_hint.setStyleSheet("color: #a5d6a7; font-size: 11px;")
+
+    def _auth_config(self) -> dict:
+        """Build the AuthConfig dict for the scan payload."""
+        return {
+            "enabled":        self.opt_auth.isChecked(),
+            "login_url":      self.auth_login_url.text().strip(),
+            "username_field": self.auth_username_field.text().strip() or "username",
+            "password_field": self.auth_password_field.text().strip() or "password",
+            "username":       self.auth_username_val.text().strip(),
+            "password":       self.auth_password_val.text(),
+        }
+
+    # ── Brute Force helpers ───────────────────────────────────────────────────
+
+    _COMMON_USERNAMES = [
+        "admin", "administrator", "root", "user", "test", "guest",
+        "demo", "info", "support", "webmaster", "operator", "manager",
+    ]
+
+    _COMMON_PASSWORDS = [
+        "123456", "password", "123456789", "12345678", "12345",
+        "1234567", "qwerty", "abc123", "password1", "admin",
+        "iloveyou", "111111", "123123", "welcome", "monkey",
+        "dragon", "master", "letmein", "login", "pass",
+        "test", "000000", "admin123", "654321", "P@ssw0rd",
+    ]
+
+    def _toggle_bruteforce_fields(self, state: int) -> None:
+        enabled = state == Qt.CheckState.Checked.value
+        for w in self._bf_widgets:
+            w.setEnabled(enabled)
+
+    def _load_common_usernames(self) -> None:
+        self.bf_usernames.setPlainText("\n".join(self._COMMON_USERNAMES))
+
+    def _load_common_passwords(self) -> None:
+        self.bf_passwords.setPlainText("\n".join(self._COMMON_PASSWORDS))
+
+    _UPLOAD_LINE_LIMIT = 10_000  # cap เพื่อป้องกัน GUI ค้างเมื่อเปิดไฟล์ใหญ่ (เช่น rockyou.txt)
+
+    def _upload_usernames(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open Username List", "", "Text files (*.txt);;All files (*)"
+        )
+        if not path:
+            return
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            lines = [ln.strip() for ln in f if ln.strip()]
+        truncated = len(lines) > self._UPLOAD_LINE_LIMIT
+        lines = lines[: self._UPLOAD_LINE_LIMIT]
+        self.bf_usernames.setPlainText("\n".join(lines))
+        if truncated:
+            self._append_log(
+                f"[Brute Force] warning: username file truncated to {self._UPLOAD_LINE_LIMIT:,} lines"
+            )
+
+    def _upload_passwords(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open Password List", "", "Text files (*.txt);;All files (*)"
+        )
+        if not path:
+            return
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            lines = [ln.strip() for ln in f if ln.strip()]
+        truncated = len(lines) > self._UPLOAD_LINE_LIMIT
+        lines = lines[: self._UPLOAD_LINE_LIMIT]
+        self.bf_passwords.setPlainText("\n".join(lines))
+        if truncated:
+            self._append_log(
+                f"[Brute Force] warning: password file truncated to {self._UPLOAD_LINE_LIMIT:,} lines"
+            )
+
+    def _brute_force_config(self) -> dict:
+        usernames = [u for u in self.bf_usernames.toPlainText().splitlines() if u.strip()]
+        passwords = [p for p in self.bf_passwords.toPlainText().splitlines() if p.strip()]
+        return {
+            "enabled":        self.opt_bruteforce.isChecked(),
+            "login_url":      self.bf_login_url.text().strip(),
+            "username_field": "",
+            "password_field": "",
+            "usernames":      usernames,
+            "passwords":      passwords,
+            "delay_ms":       self.bf_delay.value(),
+            "stop_on_success": self.bf_stop_on_success.isChecked(),
+            "max_attempts":   self.bf_max_attempts.value(),
+        }
+
     def _module_options(self):
         return {
             "headers": self.opt_headers.isChecked(),
@@ -587,6 +965,7 @@ class ScannerGUI(QWidget):
             "cve": self.opt_cve.isChecked(),
             "zap": self.opt_zap.isChecked(),
             "bac": self.opt_bac.isChecked(),
+            "cmdi": self.opt_cmdi.isChecked(),
         }
 
     def _report_formats(self):
@@ -615,7 +994,49 @@ class ScannerGUI(QWidget):
             self.set_status("Validation failed: no report format selected")
             return
 
+        if self.opt_auth.isChecked():
+            if not self.auth_login_url.text().strip():
+                self.output.setText("Authentication enabled: Login URL is required")
+                self.set_status("Validation failed: Login URL empty")
+                return
+            cred = self.auth_username_val.text().strip()
+            if not cred:
+                self.output.setText("Authentication enabled: Username/Email is required")
+                self.set_status("Validation failed: Username empty")
+                return
+            if not (_EMAIL_RE.match(cred) or _USERNAME_RE.match(cred)):
+                self.output.setText(
+                    "Authentication enabled: Username must be a valid Email or Username (min 3 chars)"
+                )
+                self.set_status("Validation failed: invalid credential format")
+                return
+            if len(self.auth_password_val.text()) < AUTH_MIN_PASSWORD_LEN:
+                self.output.setText(
+                    f"Authentication enabled: Password must be at least {AUTH_MIN_PASSWORD_LEN} characters"
+                )
+                self.set_status("Validation failed: Password too short")
+                return
+
+        if self.opt_bruteforce.isChecked():
+            bf_login = self.bf_login_url.text().strip()
+            auth_login = self.auth_login_url.text().strip() if self.opt_auth.isChecked() else ""
+            if not bf_login and not auth_login:
+                self.output.setText("Brute Force enabled: Login URL is required (set here or in Authentication)")
+                self.set_status("Validation failed: Brute Force login URL empty")
+                return
+            users = [u for u in self.bf_usernames.toPlainText().splitlines() if u.strip()]
+            if not users:
+                self.output.setText("Brute Force enabled: Usernames list must not be empty")
+                self.set_status("Validation failed: no usernames")
+                return
+            pwords = [p for p in self.bf_passwords.toPlainText().splitlines() if p.strip()]
+            if not pwords:
+                self.output.setText("Brute Force enabled: Passwords list must not be empty")
+                self.set_status("Validation failed: no passwords")
+                return
+
         self.output.clear()
+        self._log_index = 0
         self._append_log("Scanning... please wait")
         self.scan_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
@@ -639,6 +1060,8 @@ class ScannerGUI(QWidget):
             "timed_mode": timed,
             "time_limit_secs": self.time_limit_mins.value() * 60 if timed else 0,
             "full_scan_mode": full,
+            "auth": self._auth_config(),
+            "brute_force": self._brute_force_config(),
         }
 
         self.scan_thread = QThread()
@@ -676,13 +1099,78 @@ class ScannerGUI(QWidget):
             self.scan_worker.cancel()
         self.set_status("Cancelling scan...")
 
-    def _append_log(self, message):
-        """Append a timestamped line to the output box (slot called from worker via signal)."""
+    # ── Log color palette (dark theme) ───────────────────────────────────────────
+    _LOG_COLORS = {
+        "zap":     "#4fc3f7",   # cyan  — [ZAPScanner] lines
+        "engine":  "#a5d6a7",   # green — [Engine] lines
+        "error":   "#ef9a9a",   # red   — fail / error keywords
+        "success": "#fff176",   # yellow— complete / ready / done / saved
+        "warn":    "#ffcc80",   # orange— warning / timeout / unavailable
+        "default": "#cfd8dc",   # grey-white — everything else
+    }
+    _LOG_TS_COLOR  = "#546e7a"  # muted blue-grey for the timestamp
+    _MAX_LOG_LINES = 500        # trim oldest lines when exceeded
+
+    def _append_log(self, message: str) -> None:
+        """
+        Append a color-coded, HTML-escaped, timestamped line to the output box
+        and smoothly animate the scrollbar to the new bottom position.
+
+        Color rules (first match wins):
+          [ZAPScanner] → cyan
+          [Engine]     → green
+          fail/error   → red
+          complete/done/ready/saved → yellow
+          warning/timeout/unavailable → orange
+          otherwise    → default grey-white
+        """
         now = datetime.now().strftime("%H:%M:%S")
-        self.output.append(f"[{now}] {message}")
+        escaped = _html.escape(str(message))
+
+        msg_lower = message.lower()
+        if "[ZAPScanner]" in message:
+            color = self._LOG_COLORS["zap"]
+        elif "[Engine]" in message:
+            color = self._LOG_COLORS["engine"]
+        elif any(w in msg_lower for w in ("fail", "error", "not found")):
+            color = self._LOG_COLORS["error"]
+        elif any(w in msg_lower for w in ("complete", "done", "ready", "saved", "success")):
+            color = self._LOG_COLORS["success"]
+        elif any(w in msg_lower for w in ("warning", "timeout", "unavailable")):
+            color = self._LOG_COLORS["warn"]
+        else:
+            color = self._LOG_COLORS["default"]
+
+        line_html = (
+            f'<span style="color:{self._LOG_TS_COLOR}">[{now}]</span>'
+            f'&nbsp;<span style="color:{color}">{escaped}</span>'
+        )
+        self.output.append(line_html)
+
+        # Trim oldest lines once the document exceeds the limit
+        doc = self.output.document()
+        if doc.blockCount() > self._MAX_LOG_LINES:
+            trim = QTextCursor(doc.begin())
+            trim.movePosition(
+                QTextCursor.MoveOperation.NextBlock,
+                QTextCursor.MoveMode.KeepAnchor,
+                doc.blockCount() - self._MAX_LOG_LINES,
+            )
+            trim.removeSelectedText()
+
+        # Smooth-scroll to bottom using QPropertyAnimation (250 ms, ease-out)
+        sb = self.output.verticalScrollBar()
+        if self._scroll_anim is None:
+            self._scroll_anim = QPropertyAnimation(sb, b"value", self)
+            self._scroll_anim.setDuration(250)
+            self._scroll_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._scroll_anim.stop()
+        self._scroll_anim.setStartValue(sb.value())
+        self._scroll_anim.setEndValue(sb.maximum())
+        self._scroll_anim.start()
 
     def _poll_progress(self):
-        """Poll /progress every second and update the progress bar (called by QTimer)."""
+        """Poll /progress and /logs every second; update the progress bar and log box."""
         try:
             p = progress_check()
             phase = p.get("phase", "idle")
@@ -702,6 +1190,15 @@ class ScannerGUI(QWidget):
                 self.progress.setRange(0, 100)
                 self.progress.setValue(98)
                 self.progress.setFormat("Generating reports... (98%%)")
+        except Exception:
+            pass
+
+        # Pull new backend log lines ([Engine] / [ZAPScanner]) and display them.
+        try:
+            result = logs_check(self._log_index)
+            for line in result.get("lines", []):
+                self._append_log(line)
+            self._log_index = result.get("next", self._log_index)
         except Exception:
             pass
 

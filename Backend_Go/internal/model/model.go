@@ -43,6 +43,7 @@ type ModuleOptions struct {
 	CVE       bool `json:"cve"`
 	ZAP       bool `json:"zap"`
 	BAC       bool `json:"bac"`
+	CMDi      bool `json:"cmdi"`
 }
 
 // AuthConfig holds credentials for form-based authentication.
@@ -56,6 +57,21 @@ type AuthConfig struct {
 	PasswordField string `json:"password_field"`
 	Username      string `json:"username"`
 	Password      string `json:"password"`
+}
+
+// BruteForceConfig controls credential brute-force testing against a login form.
+// The engine tries every (username, password) pair from Usernames × Passwords.
+// Successful logins are reported as Critical findings (A07:2025, CWE-521/307).
+type BruteForceConfig struct {
+	Enabled       bool     `json:"enabled"`
+	LoginURL      string   `json:"login_url"`       // login endpoint to attack (falls back to AuthConfig.LoginURL)
+	UsernameField string   `json:"username_field"`  // HTML input name (auto-detected if empty)
+	PasswordField string   `json:"password_field"`  // HTML input name (auto-detected if empty)
+	Usernames     []string `json:"usernames"`       // list of usernames/emails to try
+	Passwords     []string `json:"passwords"`       // list of passwords to try
+	DelayMs       int      `json:"delay_ms"`        // ms between attempts (min 100, default 300)
+	StopOnSuccess bool     `json:"stop_on_success"` // stop after the first successful login
+	MaxAttempts   int      `json:"max_attempts"`    // safety cap — max total attempts (default 100, hard max 500)
 }
 
 // ScanRequest is the JSON body sent by the GUI to POST /scan.
@@ -72,7 +88,8 @@ type ScanRequest struct {
 	TimedMode      bool          `json:"timed_mode"`
 	TimeLimitSecs  int           `json:"time_limit_secs"`
 	FullScanMode   bool          `json:"full_scan_mode"`
-	Auth           AuthConfig    `json:"auth"`
+	Auth           AuthConfig       `json:"auth"`
+	BruteForce     BruteForceConfig `json:"brute_force"`
 }
 
 // Finding represents a single security vulnerability discovered by a plugin.

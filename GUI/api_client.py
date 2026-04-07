@@ -30,7 +30,8 @@ BASE_URL = "http://127.0.0.1:5500"
 
 def _build_payload(target, options, report_formats, max_pages, max_depth, request_delay_ms,
                    zap_base_url="http://localhost:8880", zap_api_key="",
-                   timed_mode=False, time_limit_secs=0, full_scan_mode=False, auth=None):
+                   timed_mode=False, time_limit_secs=0, full_scan_mode=False,
+                   auth=None, brute_force=None):
     """Build the ScanRequest JSON payload dict from individual GUI input values."""
     return {
         "target": target,
@@ -55,12 +56,18 @@ def _build_payload(target, options, report_formats, max_pages, max_depth, reques
         "full_scan_mode": full_scan_mode,
         "auth": auth or {"enabled": False, "login_url": "", "username_field": "",
                          "password_field": "", "username": "", "password": ""},
+        "brute_force": brute_force or {
+            "enabled": False, "login_url": "", "username_field": "", "password_field": "",
+            "usernames": [], "passwords": [], "delay_ms": 300,
+            "stop_on_success": True, "max_attempts": 100,
+        },
     }
 
 
 def start_scan_with_session(session, target, options=None, report_formats=None, max_pages=30, max_depth=2,
                             request_delay_ms=100, zap_base_url="http://localhost:8880", zap_api_key="",
-                            timed_mode=False, time_limit_secs=0, full_scan_mode=False):
+                            timed_mode=False, time_limit_secs=0, full_scan_mode=False,
+                            auth=None, brute_force=None):
     """
     POST /scan using the provided requests.Session.
 
@@ -72,7 +79,8 @@ def start_scan_with_session(session, target, options=None, report_formats=None, 
     Raises requests.HTTPError on non-2xx responses.
     """
     payload = _build_payload(target, options, report_formats, max_pages, max_depth, request_delay_ms,
-                             zap_base_url, zap_api_key, timed_mode, time_limit_secs, full_scan_mode)
+                             zap_base_url, zap_api_key, timed_mode, time_limit_secs, full_scan_mode,
+                             auth, brute_force)
     r = session.post(f"{BASE_URL}/scan", json=payload, timeout=None)
     r.raise_for_status()
     return r.json()
@@ -102,5 +110,32 @@ def health_check():
     is ready to accept scan requests. Raises on connection error or non-2xx.
     """
     r = requests.get(f"{BASE_URL}/health", timeout=2)
+    r.raise_for_status()
+    return r.json()
+
+
+def cancel_scan():
+    """
+    POST /cancel — signals the Go backend to abort the current scan immediately.
+
+    This is more reliable than closing the requests.Session because session.close()
+    only prevents new connections; it does not interrupt a POST /scan that is
+    already blocking while waiting for the response.
+    """
+    try:
+        requests.post(f"{BASE_URL}/cancel", timeout=2)
+    except Exception:
+        pass
+
+
+def logs_check(after=0):
+    """
+    GET /logs?after=N → {"lines": [...], "next": N}
+
+    Returns backend log lines (from [Engine] and [ZAPScanner]) added since
+    index `after`. The caller should pass the returned `next` value on the
+    next call to receive only new lines (incremental polling).
+    """
+    r = requests.get(f"{BASE_URL}/logs", params={"after": after}, timeout=2)
     r.raise_for_status()
     return r.json()

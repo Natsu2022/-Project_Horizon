@@ -24,6 +24,7 @@ package api
 import (
 	"context"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -32,6 +33,14 @@ import (
 	"vuln_assessment_app/internal/engine"
 	"vuln_assessment_app/internal/httpclient"
 	"vuln_assessment_app/internal/model"
+)
+
+var (
+	// authEmailRe / authUsernameRe mirror the GUI-side validation in main.py.
+	// Email: standard user@domain.tld pattern.
+	// Username: 3–64 chars, letters/digits/underscores/hyphens/dots.
+	authEmailRe    = regexp.MustCompile(`(?i)^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$`)
+	authUsernameRe = regexp.MustCompile(`^[a-zA-Z0-9_\-.]{3,64}$`)
 )
 
 func ScanHandler(c *gin.Context) {
@@ -66,15 +75,67 @@ func ScanHandler(c *gin.Context) {
 	if req.RequestDelayMs > 500 {
 		req.RequestDelayMs = 500
 	}
-	if req.Options.ZAP && req.ZAPBaseURL == "" {
-		req.ZAPBaseURL = "http://localhost:8880"
-	}
+	// ZAPBaseURL is intentionally left empty when not provided:
+	// ZAPScanner.resolveBaseURL() will probe common ports (8080, 8880, 8090, 8443)
+	// and use the first one that responds.
 	if len(req.ReportFormats) == 0 {
 		req.ReportFormats = []string{"json", "html", "pdf"}
 	}
 
-	if req.Options == (model.ModuleOptions{}) {
-		req.Options = model.ModuleOptions{Headers: true, Misconfig: true, TLS: true, XSS: true, SQLi: true, CVE: true, BAC: true}
+	if req.Auth.Enabled {
+		req.Auth.LoginURL = strings.TrimSpace(req.Auth.LoginURL)
+		if req.Auth.LoginURL == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "auth.login_url is required when authentication is enabled"})
+			return
+		}
+		req.Auth.Username = strings.TrimSpace(req.Auth.Username)
+		if req.Auth.Username == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "auth.username is required when authentication is enabled"})
+			return
+		}
+		if !authEmailRe.MatchString(req.Auth.Username) && !authUsernameRe.MatchString(req.Auth.Username) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "auth.username must be a valid email address or username (3–64 chars)"})
+			return
+		}
+		if len(req.Auth.Password) < 8 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "auth.password must be at least 8 characters"})
+			return
+		}
+		if req.Auth.UsernameField == "" {
+			req.Auth.UsernameField = "username"
+		}
+		if req.Auth.PasswordField == "" {
+			req.Auth.PasswordField = "password"
+		}
+	}
+
+	if req.BruteForce.Enabled {
+		if req.BruteForce.LoginURL == "" {
+			req.BruteForce.LoginURL = strings.TrimSpace(req.Auth.LoginURL)
+		} else {
+			req.BruteForce.LoginURL = strings.TrimSpace(req.BruteForce.LoginURL)
+		}
+		if req.BruteForce.LoginURL == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "brute_force.login_url is required"})
+			return
+		}
+		if len(req.BruteForce.Usernames) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "brute_force.usernames must not be empty"})
+			return
+		}
+		if len(req.BruteForce.Passwords) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "brute_force.passwords must not be empty"})
+			return
+		}
+		if req.BruteForce.DelayMs < 100 {
+			req.BruteForce.DelayMs = 100
+		}
+		if req.BruteForce.MaxAttempts <= 0 {
+			req.BruteForce.MaxAttempts = 100
+		}
+		if req.BruteForce.MaxAttempts > 500 {
+			req.BruteForce.MaxAttempts = 500
+		}
 	}
 
 	var scanCtx context.Context
@@ -99,6 +160,14 @@ func ScanHandler(c *gin.Context) {
 	} else {
 		scanCtx = c.Request.Context()
 	}
+
+	// Wrap with an extra cancel layer so POST /cancel can stop the scan
+	// immediately — Python's session.close() alone does not reliably abort
+	// the in-flight HTTP request on the client side.
+	scanCtx, apiCancel := context.WithCancel(scanCtx)
+	defer apiCancel()
+	engine.SetGlobalCancel(apiCancel)
+	defer engine.SetGlobalCancel(nil)
 
 	scanner := engine.NewEngine(req)
 	result := scanner.Run(scanCtx)

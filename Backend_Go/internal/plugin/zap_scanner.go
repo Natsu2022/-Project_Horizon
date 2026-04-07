@@ -42,6 +42,9 @@ import (
 	"vuln_assessment_app/internal/standards"
 )
 
+// zapCommonPorts lists ZAP daemon ports probed (in order) when no BaseURL is given.
+var zapCommonPorts = []int{8080, 8880, 8090, 8443}
+
 // ZAP API response types
 type zapScanResp struct {
 	Scan string `json:"scan"`
@@ -74,13 +77,52 @@ type zapInstance struct {
 // ZAPScanner calls a running OWASP ZAP daemon via its REST API.
 // It runs Spider + Active Scan on the seed URL (Depth == 0) exactly once per engine run.
 type ZAPScanner struct {
-	BaseURL string
-	APIKey  string
-	once    sync.Once
-	results []model.Finding
+	BaseURL    string
+	APIKey     string
+	once       sync.Once
+	results    []model.Finding
+	ReportHTML []byte // raw HTML from /OTHER/core/other/htmlreport/ — saved by the engine
 }
 
 func (z *ZAPScanner) Name() string { return "zap" }
+
+// checkZAPHealth pings /JSON/core/view/version/ to verify ZAP is reachable at base.
+// Uses a 3-second probe timeout independent of the scan context.
+func (z *ZAPScanner) checkZAPHealth(client *http.Client, base string) bool {
+	probeCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	endpoint := fmt.Sprintf("%s/JSON/core/view/version/?apikey=%s", base, url.QueryEscape(z.APIKey))
+	body := z.getJSON(probeCtx, client, endpoint)
+	return body != nil && strings.Contains(string(body), "version")
+}
+
+// resolveBaseURL returns the first ZAP base URL that passes the health check.
+// If z.BaseURL is non-empty it is verified first; on failure zapCommonPorts
+// are probed in order. Returns "" when no reachable ZAP instance is found.
+func (z *ZAPScanner) resolveBaseURL(client *http.Client) string {
+	configured := strings.TrimRight(z.BaseURL, "/")
+	candidates := []string{}
+	if configured != "" {
+		candidates = append(candidates, configured)
+	}
+	for _, port := range zapCommonPorts {
+		candidate := fmt.Sprintf("http://localhost:%d", port)
+		if candidate != configured {
+			candidates = append(candidates, candidate)
+		}
+	}
+	for _, base := range candidates {
+		if z.checkZAPHealth(client, base) {
+			if base != configured {
+				log.Printf("[ZAPScanner] auto-detected ZAP at %s", base)
+			} else {
+				log.Printf("[ZAPScanner] ZAP confirmed at %s", base)
+			}
+			return base
+		}
+	}
+	return ""
+}
 
 func (z *ZAPScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding {
 	if u.Depth != 0 {
@@ -94,13 +136,19 @@ func (z *ZAPScanner) Scan(ctx context.Context, u model.URLInfo) []model.Finding 
 
 func (z *ZAPScanner) runZAPScan(ctx context.Context, target string) []model.Finding {
 	client := &http.Client{Timeout: 15 * time.Second}
-	base := strings.TrimRight(z.BaseURL, "/")
+
+	// Step 0 — Auto-detect ZAP port (probe configured URL first, then common ports)
+	base := z.resolveBaseURL(client)
+	if base == "" {
+		log.Println("[ZAPScanner] no reachable ZAP daemon found on any common port — is ZAP running?")
+		return nil
+	}
 
 	// Step 1 — Traditional spider (fast; works for standard HTML sites)
 	log.Printf("[ZAPScanner] step 1/4 traditional spider on %s", target)
-	spiderID := z.startScan(ctx, client, base, "spider", target)
+	spiderID := z.startScan(ctx, client, base, "spider", target, "")
 	if spiderID == "" {
-		log.Println("[ZAPScanner] failed to start spider — is ZAP running?")
+		log.Println("[ZAPScanner] failed to start spider")
 		return nil
 	}
 	if !z.waitScan(ctx, client, base, "spider", spiderID) {
@@ -116,9 +164,10 @@ func (z *ZAPScanner) runZAPScan(ctx context.Context, target string) []model.Find
 		log.Println("[ZAPScanner] AJAX spider unavailable or failed — continuing without it")
 	}
 
-	// Step 3 — Active scan (attack phase)
+	// Step 3 — Active scan (attack phase); recurse=true covers all URLs ZAP
+	// discovered during the spider phase, not just the seed URL.
 	log.Printf("[ZAPScanner] step 3/4 active scan on %s", target)
-	ascanID := z.startScan(ctx, client, base, "ascan", target)
+	ascanID := z.startScan(ctx, client, base, "ascan", target, "&recurse=true&inScopeOnly=false")
 	if ascanID == "" {
 		log.Println("[ZAPScanner] failed to start active scan")
 		return nil
@@ -128,8 +177,38 @@ func (z *ZAPScanner) runZAPScan(ctx context.Context, target string) []model.Find
 	}
 
 	// Step 4 — Collect alerts
-	log.Printf("[ZAPScanner] step 4/4 fetching alerts")
-	return z.fetchAlerts(ctx, client, base, target)
+	log.Printf("[ZAPScanner] step 4/5 fetching alerts")
+	findings := z.fetchAlerts(ctx, client, base, target)
+
+	// Step 5 — Download ZAP's own HTML report for inclusion as a report artifact
+	log.Printf("[ZAPScanner] step 5/5 downloading ZAP HTML report")
+	z.ReportHTML = z.fetchZAPReport(ctx, client, base)
+	if len(z.ReportHTML) == 0 {
+		log.Println("[ZAPScanner] ZAP HTML report unavailable — skipping")
+	}
+
+	return findings
+}
+
+// fetchZAPReport downloads ZAP's built-in HTML report from /OTHER/core/other/htmlreport/.
+// Uses /OTHER/ prefix so ZAP returns raw HTML instead of a JSON wrapper.
+func (z *ZAPScanner) fetchZAPReport(ctx context.Context, client *http.Client, base string) []byte {
+	endpoint := fmt.Sprintf("%s/OTHER/core/other/htmlreport/?apikey=%s",
+		base, url.QueryEscape(z.APIKey))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil
+	}
+	return body
 }
 
 // runAjaxSpider starts ZAP's AJAX spider and waits until it stops.
@@ -143,6 +222,9 @@ func (z *ZAPScanner) runZAPScan(ctx context.Context, target string) []model.Find
 //	"running" — still crawling
 //	"stopped"  — finished (timeout reached or no new URLs found)
 //
+// A hard cap of 2 minutes is enforced; if ZAP has not finished by then
+// a stop command is sent and the function returns true so scanning continues.
+//
 // Returns false if the AJAX spider add-on is not installed or the request
 // fails; the caller should treat this as a non-fatal condition.
 func (z *ZAPScanner) runAjaxSpider(ctx context.Context, client *http.Client, base, target string) bool {
@@ -154,16 +236,23 @@ func (z *ZAPScanner) runAjaxSpider(ctx context.Context, client *http.Client, bas
 		return false
 	}
 
-	// Poll every 5 s until status == "stopped" or context is cancelled
+	// Poll every 5 s until status == "stopped", 2-minute cap, or context cancelled
 	statusEP := fmt.Sprintf("%s/JSON/ajaxSpider/view/status/?apikey=%s",
 		base, url.QueryEscape(z.APIKey))
 	stopEP := fmt.Sprintf("%s/JSON/ajaxSpider/action/stop/?apikey=%s",
 		base, url.QueryEscape(z.APIKey))
 
+	deadline := time.Now().Add(2 * time.Minute)
+
 	for {
 		if ctx.Err() != nil {
 			z.getJSON(ctx, client, stopEP) // best-effort stop
 			return false
+		}
+		if time.Now().After(deadline) {
+			log.Println("[ZAPScanner] ajaxSpider: 2-minute timeout reached — stopping")
+			z.getJSON(ctx, client, stopEP)
+			return true
 		}
 		statusBody := z.getJSON(ctx, client, statusEP)
 		if statusBody != nil {
@@ -187,9 +276,10 @@ func (z *ZAPScanner) runAjaxSpider(ctx context.Context, client *http.Client, bas
 }
 
 // startScan triggers a ZAP spider or active scan and returns the scan ID.
-func (z *ZAPScanner) startScan(ctx context.Context, client *http.Client, base, component, target string) string {
-	endpoint := fmt.Sprintf("%s/JSON/%s/action/scan/?apikey=%s&url=%s",
-		base, component, url.QueryEscape(z.APIKey), url.QueryEscape(target))
+// extraParams is appended verbatim to the query string (e.g. "&recurse=true&inScopeOnly=false").
+func (z *ZAPScanner) startScan(ctx context.Context, client *http.Client, base, component, target, extraParams string) string {
+	endpoint := fmt.Sprintf("%s/JSON/%s/action/scan/?apikey=%s&url=%s%s",
+		base, component, url.QueryEscape(z.APIKey), url.QueryEscape(target), extraParams)
 	body := z.getJSON(ctx, client, endpoint)
 	if body == nil {
 		return ""
@@ -227,18 +317,31 @@ func (z *ZAPScanner) waitScan(ctx context.Context, client *http.Client, base, co
 	}
 }
 
-// fetchAlerts retrieves all ZAP alerts and converts them to model.Finding.
+// fetchAlerts retrieves all ZAP alerts using /JSON/alert/view/alerts/ with pagination
+// and converts them to model.Finding. Pages of 5 000 are fetched until exhausted.
 func (z *ZAPScanner) fetchAlerts(ctx context.Context, client *http.Client, base, target string) []model.Finding {
-	endpoint := fmt.Sprintf("%s/JSON/core/view/alerts/?apikey=%s", base, url.QueryEscape(z.APIKey))
-	body := z.getJSON(ctx, client, endpoint)
-	if body == nil {
-		return nil
+	const pageSize = 5000
+	allAlerts := make([]zapAlert, 0)
+	for start := 0; ; start += pageSize {
+		endpoint := fmt.Sprintf(
+			"%s/JSON/alert/view/alerts/?apikey=%s&baseurl=%s&start=%d&count=%d",
+			base, url.QueryEscape(z.APIKey), url.QueryEscape(target), start, pageSize,
+		)
+		body := z.getJSON(ctx, client, endpoint)
+		if body == nil {
+			break
+		}
+		var page zapAlertsResp
+		if err := json.Unmarshal(body, &page); err != nil {
+			log.Println("[ZAPScanner] failed to parse alerts:", err)
+			break
+		}
+		allAlerts = append(allAlerts, page.Alerts...)
+		if len(page.Alerts) < pageSize {
+			break // last page reached
+		}
 	}
-	var resp zapAlertsResp
-	if err := json.Unmarshal(body, &resp); err != nil {
-		log.Println("[ZAPScanner] failed to parse alerts:", err)
-		return nil
-	}
+	resp := zapAlertsResp{Alerts: allAlerts}
 
 	log.Printf("[ZAPScanner] raw alerts from ZAP: %d total", len(resp.Alerts))
 	infoSkipped := 0

@@ -169,6 +169,38 @@ func (h *HeaderScanner) Scan(ctx context.Context, u model.URLInfo) []model.Findi
 		findings = append(findings, f)
 	}
 
+	if xxp := resp.Header.Get("X-XSS-Protection"); xxp == "" {
+		f := model.NewFinding(
+			"headers",
+			"missing_security_header",
+			"Missing X-XSS-Protection",
+			"X-XSS-Protection header is absent. While deprecated in modern browsers, its absence may leave legacy browsers without the built-in XSS filter.",
+			"Low",
+			standards.A06InsecureDesign,
+			u.URL,
+			"X-XSS-Protection header not found",
+			"Set X-XSS-Protection: 1; mode=block for legacy browser support. Modern browsers should rely on Content-Security-Policy instead.",
+			standards.A06URL,
+		)
+		f.CWEIDs = []string{"CWE-693"}
+		findings = append(findings, f)
+	} else if xxp == "0" {
+		f := model.NewFinding(
+			"headers",
+			"weak_security_header",
+			"X-XSS-Protection Disabled",
+			"X-XSS-Protection is explicitly set to 0, disabling the legacy browser XSS filter. Ensure a strong Content-Security-Policy is in place.",
+			"Low",
+			standards.A06InsecureDesign,
+			u.URL,
+			"X-XSS-Protection: 0 (XSS filter explicitly disabled)",
+			"Remove the X-XSS-Protection: 0 header or set it to 1; mode=block. Ensure a strong Content-Security-Policy is in place.",
+			standards.A06URL,
+		)
+		f.CWEIDs = []string{"CWE-693"}
+		findings = append(findings, f)
+	}
+
 	for i := range findings {
 		findings[i].ID = buildID("HDR", u.URL, i)
 		findings[i].Request = reqDump
