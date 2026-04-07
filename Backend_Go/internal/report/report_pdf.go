@@ -52,8 +52,11 @@ func writePDF(path string, payload reportPayload) error {
 	})
 
 	drawCoverPage(pdf, payload)
+	drawExecSummary(pdf, payload)
+	drawMethodology(pdf, payload)
 	drawSummaryTable(pdf, payload)
 	drawDetailedFindings(pdf, payload)
+	drawConclusions(pdf, payload)
 
 	return pdf.OutputFileAndClose(path)
 }
@@ -369,4 +372,98 @@ func drawDetailedFindings(pdf *fpdf.Fpdf, payload reportPayload) {
 		pdf.Line(15, pdf.GetY()+3, 195, pdf.GetY()+3)
 		pdf.SetY(pdf.GetY() + 8)
 	}
+}
+
+// drawSectionHeader draws the standard navy header bar used by all report sections.
+func drawSectionHeader(pdf *fpdf.Fpdf, title string) {
+	pdf.SetFillColor(25, 50, 95)
+	pdf.Rect(15, 15, 180, 10, "F")
+	pdf.SetFont("Helvetica", "B", 12)
+	pdf.SetTextColor(255, 255, 255)
+	pdf.SetXY(18, 15)
+	pdf.CellFormat(176, 10, tr(pdf, title), "", 1, "L", false, 0, "")
+	pdf.SetY(30)
+}
+
+// drawExecSummary renders the Executive Summary section on a new page.
+func drawExecSummary(pdf *fpdf.Fpdf, payload reportPayload) {
+	if payload.ExecSummary == "" {
+		return
+	}
+	pdf.AddPage()
+	drawSectionHeader(pdf, "Executive Summary")
+	pdf.SetFont("Helvetica", "", 10)
+	pdf.SetTextColor(15, 15, 15)
+	pdf.SetX(15)
+	pdf.MultiCell(180, 6, tr(pdf, payload.ExecSummary), "", "L", false)
+}
+
+// drawMethodology renders the Methodology section on a new page.
+func drawMethodology(pdf *fpdf.Fpdf, payload reportPayload) {
+	if payload.Methodology == "" {
+		return
+	}
+	pdf.AddPage()
+	drawSectionHeader(pdf, "Methodology")
+
+	// Intro paragraph
+	pdf.SetFont("Helvetica", "", 10)
+	pdf.SetTextColor(15, 15, 15)
+	pdf.SetX(15)
+	pdf.MultiCell(180, 6, tr(pdf, payload.Methodology), "", "L", false)
+
+	// Phase table
+	pdf.SetY(pdf.GetY() + 8)
+	phases := [][]string{
+		{"1 - Discovery", "Breadth-first crawler maps all reachable endpoints on the target host within configured depth and page limits."},
+		{"2 - Plugin Scan", "Each URL is tested by enabled modules: headers, TLS, XSS, SQLi, CMDi, BAC, CVE, and optional ZAP integration."},
+		{"3 - OWASP Mapping", "Every finding is classified against OWASP Top 10:2025 (A01-A10) and assigned a CVSS score by severity."},
+		{"4 - Reporting", "Deduplicated, severity-sorted findings are compiled into JSON, HTML, and PDF report artifacts."},
+	}
+	colW := []float64{45, 135}
+	// Header row
+	pdf.SetFillColor(50, 80, 130)
+	pdf.SetTextColor(255, 255, 255)
+	pdf.SetFont("Helvetica", "B", 9)
+	pdf.SetX(15)
+	pdf.CellFormat(colW[0], 7, "Phase", "B", 0, "L", true, 0, "")
+	pdf.CellFormat(colW[1], 7, "Description", "B", 1, "L", true, 0, "")
+	// Data rows
+	for i, row := range phases {
+		if i%2 == 0 {
+			pdf.SetFillColor(255, 255, 255)
+		} else {
+			pdf.SetFillColor(240, 244, 251)
+		}
+		rowY := pdf.GetY()
+		// Measure description height
+		pdf.SetFont("Helvetica", "", 9)
+		lines := pdf.SplitLines([]byte(tr(pdf, row[1])), colW[1])
+		rowH := float64(len(lines)) * 5.0
+		if rowH < 7 {
+			rowH = 7
+		}
+		pdf.Rect(15, rowY, colW[0]+colW[1], rowH, "F")
+		pdf.SetTextColor(15, 15, 15)
+		pdf.SetFont("Helvetica", "B", 9)
+		pdf.SetXY(15, rowY+(rowH-5)/2)
+		pdf.CellFormat(colW[0], 5, tr(pdf, row[0]), "", 0, "L", false, 0, "")
+		pdf.SetFont("Helvetica", "", 9)
+		pdf.SetXY(15+colW[0], rowY)
+		pdf.MultiCell(colW[1], 5, tr(pdf, row[1]), "", "L", false)
+		pdf.SetY(rowY + rowH)
+	}
+}
+
+// drawConclusions renders the Conclusions & Recommendations section on a new page.
+func drawConclusions(pdf *fpdf.Fpdf, payload reportPayload) {
+	if payload.Conclusions == "" {
+		return
+	}
+	pdf.AddPage()
+	drawSectionHeader(pdf, "Conclusions & Recommendations")
+	pdf.SetFont("Helvetica", "", 10)
+	pdf.SetTextColor(15, 15, 15)
+	pdf.SetX(15)
+	pdf.MultiCell(180, 6, tr(pdf, payload.Conclusions), "", "L", false)
 }

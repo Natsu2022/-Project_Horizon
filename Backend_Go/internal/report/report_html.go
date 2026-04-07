@@ -42,6 +42,9 @@ type htmlReportData struct {
 	Stats       model.ScanStats
 	Modules     []moduleCount
 	Findings    []htmlFinding
+	ExecSummary string
+	Methodology string
+	Conclusions string
 }
 
 func writeHTML(path string, payload reportPayload) error {
@@ -98,6 +101,9 @@ func buildHTMLData(payload reportPayload) htmlReportData {
 		Stats:       payload.Stats,
 		Modules:     modules,
 		Findings:    findings,
+		ExecSummary: payload.ExecSummary,
+		Methodology: payload.Methodology,
+		Conclusions: payload.Conclusions,
 	}
 }
 
@@ -185,6 +191,10 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
 .refs-box{color:#58a6ff;font-size:12px;word-break:break-all}
 /* ── CVSS pill ──────────────────────────────────────── */
 .cvss-pill{background:#21262d;border:1px solid #30363d;border-radius:4px;font-size:11px;font-weight:700;padding:1px 7px;color:#e6edf3}
+/* ── Narrative sections ─────────────────────────────── */
+.narrative-box{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px 20px;color:#e6edf3;font-size:14px;line-height:1.7;margin-bottom:24px;white-space:pre-wrap}
+.narrative-box.methodology{border-left:3px solid #388bfd}
+.narrative-box.conclusions{border-left:3px solid #3fb950}
 /* ── Empty state ────────────────────────────────────── */
 .empty-state{text-align:center;padding:48px;color:#8b949e}
 .empty-state .emoji{font-size:40px;margin-bottom:12px}
@@ -209,6 +219,11 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
 </div>
 
 <div class="container">
+
+  {{if .ExecSummary}}
+  <div class="section-title">Executive Summary</div>
+  <div class="narrative-box">{{.ExecSummary}}</div>
+  {{end}}
 
   <!-- Severity Dashboard (clicking a card also filters) -->
   <div class="stats-grid">
@@ -242,6 +257,11 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
     <span class="pill">{{.Name}}: <strong>{{.Count}}</strong></span>
     {{end}}
   </div>
+  {{end}}
+
+  {{if .Methodology}}
+  <div class="section-title">Methodology</div>
+  <div class="narrative-box methodology">{{.Methodology}}</div>
   {{end}}
 
   <!-- Findings -->
@@ -371,6 +391,12 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
   </div>
 
   {{end}}
+
+  {{if .Conclusions}}
+  <div class="section-title">Conclusions &amp; Recommendations</div>
+  <div class="narrative-box conclusions">{{.Conclusions}}</div>
+  {{end}}
+
 </div>
 
 <script>
