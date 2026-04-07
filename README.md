@@ -8,24 +8,40 @@
 
 ## ภาพรวม
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Project Horizon                         │
-│                                                             │
-│   ┌───────────────┐        ┌────────────────────────────┐  │
-│   │  PyQt6 GUI    │──POST──▶  Go Backend (Gin :5500)    │  │
-│   │  (main.py)    │◀──JSON──  (cmd/scanner/main.go)     │  │
-│   └───────────────┘        └─────────────┬──────────────┘  │
-│                                           │                 │
-│                             ┌─────────────▼─────────────┐  │
-│                             │   ScannerEngine            │  │
-│                             │   Crawler (BFS) + 9 Plugins│  │
-│                             └─────────────┬─────────────┘  │
-│                                           │                 │
-│                             ┌─────────────▼─────────────┐  │
-│                             │   Reports (JSON/HTML/PDF)  │  │
-│                             └───────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    User(["👤 ผู้ใช้งาน"])
+
+    subgraph GUI["🖥️  PyQt6 GUI  (main.py)"]
+        G1["กรอก Target URL\n+ ตั้งค่า Options"]
+        G2["แสดงผล Findings\n+ เปิด Report"]
+    end
+
+    subgraph Backend["⚙️  Go Backend  (Gin :5500)"]
+        API["POST /scan\nScanHandler"]
+
+        subgraph Engine["ScannerEngine"]
+            Crawler["🕷️ BFS Crawler"]
+            Plugins["🔌 9 Scanner Plugins\nHeaders · Misconfig · TLS\nXSS · SQLi · CMDi\nCVE · BAC · ZAP"]
+        end
+
+        Report["📄 Report Generator"]
+    end
+
+    subgraph Reports["📁 reports/<SCAN_ID>/"]
+        R1["report.json"]
+        R2["report.html"]
+        R3["report.pdf"]
+    end
+
+    User --> G1
+    G1 -->|"POST /scan (JSON)"| API
+    API --> Crawler
+    Crawler -->|"[]URLInfo"| Plugins
+    Plugins -->|"[]Finding"| Report
+    Report --> R1 & R2 & R3
+    API -->|"ScanResponse (JSON)"| G2
+    G2 --> User
 ```
 
 ---
