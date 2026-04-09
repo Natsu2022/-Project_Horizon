@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ภาคผนวก ค — การออกแบบระบบ | Project Horizon</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+<style>
+  /* ═══════════════════════════════════════════════
+     DOCUMENT THEME — Academic / Thesis Style
+     ═══════════════════════════════════════════════ */
+  :root {
+    --primary:  #1a3a5c;
+    --accent:   #0d6efd;
+    --border:   #c8d8ea;
+    --bg-light: #f4f7fb;
+    --bg-card:  #ffffff;
+    --text:     #1a1a2e;
+    --text-dim: #4a5568;
+    --danger:   #c0392b;
+    --warn:     #d68910;
+    --ok:       #1a7a4a;
+    --purple:   #6e40c9;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', 'Noto Sans Thai', 'TH Sarabun New', sans-serif;
+    font-size: 14px;
+    line-height: 1.75;
+    color: var(--text);
+    background: var(--bg-light);
+    padding: 0;
+  }
+
+  /* ── Page Layout ── */
+  .page {
+    max-width: 960px;
+    margin: 0 auto;
+    background: white;
+    padding: 60px 72px;
+  }
+
+  /* ── Cover Header ── */
+  .doc-cover {
+    border-bottom: 3px solid var(--primary);
+    padding-bottom: 32px;
+    margin-bottom: 48px;
+  }
+  .doc-cover .klass {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+  }
+  .doc-cover h1 {
+    font-size: 26px;
+    color: var(--primary);
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .doc-cover h2 {
+    font-size: 18px;
+    color: var(--accent);
+    font-weight: 400;
+    margin-bottom: 18px;
+  }
+  .doc-cover .meta {
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+
+  /* ── Section headings ── */
+  h2.sec {
+    font-size: 20px;
+    color: var(--primary);
+    border-left: 5px solid var(--accent);
+    padding-left: 14px;
+    margin: 48px 0 8px;
+  }
+  h3.sub {
+    font-size: 16px;
+    color: var(--primary);
+    margin: 32px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h3.sub::before {
+    content: '';
+    display: inline-block;
+    width: 14px;
+    height: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  h4.diag-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 24px 0 6px;
+    background: var(--bg-light);
+    padding: 8px 14px;
+    border-radius: 6px;
+    border-left: 4px solid var(--accent);
+  }
+
+  /* ── Body text ── */
+  p { margin: 8px 0 14px; color: var(--text); }
+  ul, ol { margin: 8px 0 14px 22px; }
+  li { margin-bottom: 6px; }
+  strong { color: var(--primary); }
+
+  /* ── Table of Contents ── */
+  .toc {
+    background: var(--bg-light);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin-bottom: 40px;
+  }
+  .toc h3 { font-size: 15px; color: var(--primary); margin-bottom: 14px; }
+  .toc ol { margin-left: 18px; }
+  .toc li { margin-bottom: 5px; font-size: 13.5px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub-item { margin-left: 20px; font-size: 12.5px; color: var(--text-dim); }
+
+  /* ── Diagram container ── */
+  .diagram-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    margin: 14px 0 28px;
+    overflow-x: auto;
+    display: flex;
+    justify-content: center;
+  }
+  .diagram-wrap .mermaid {
+    min-width: 500px;
+  }
+
+  /* ── Description box ── */
+  .desc-box {
+    background: var(--bg-light);
+    border-left: 4px solid var(--accent);
+    padding: 14px 18px;
+    margin: 12px 0 20px;
+    border-radius: 0 8px 8px 0;
+    font-size: 13.5px;
+  }
+  .desc-box .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+
+  /* ── Info table ── */
+  table.info-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0 24px;
+    font-size: 13px;
+  }
+  table.info-table th {
+    background: var(--primary);
+    color: white;
+    padding: 9px 14px;
+    text-align: left;
+    font-weight: 600;
+  }
+  table.info-table td {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.info-table tr:nth-child(even) td { background: var(--bg-light); }
+  table.info-table tr:hover td { background: #e8f0fe; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-c { background: #fde8e8; color: #c0392b; border: 1px solid #c0392b; }
+  .badge-h { background: #fef3e2; color: #d68910; border: 1px solid #d68910; }
+  .badge-m { background: #e8f0fe; color: #1a6fff; border: 1px solid #1a6fff; }
+  .badge-l { background: #e8f7ee; color: #1a7a4a; border: 1px solid #1a7a4a; }
+  .badge-info { background: #e8eaf6; color: #6e40c9; border: 1px solid #6e40c9; }
+
+  /* ── Divider ── */
+  hr.sec-div { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* ── Caption ── */
+  .caption {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: -18px;
+    margin-bottom: 24px;
+    font-style: italic;
+  }
+
+  /* ── Note callout ── */
+  .note {
+    background: #fffbeb;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 12px 0 20px;
+    font-size: 13px;
+    color: #78350f;
+  }
+  .note strong { color: #92400e; }
+
+  /* ── Footer ── */
+  .doc-footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 2px solid var(--border);
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* ── Print ── */
+  @media print {
+    body { background: white; }
+    .page { padding: 40px 50px; }
+    h2.sec { page-break-before: always; }
+    .diagram-wrap { border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- COVER                                         -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="doc-cover">
+    <div class="klass">ภาคผนวก ค (Appendix C)</div>
+    <h1>การออกแบบระบบ</h1>
+    <h2>System Design — Project Horizon VA Scanner</h2>
+    <div class="meta">
+      <span>ผู้จัดทำ: ภูมินทร์ ทองลา</span>
+      <span>ปีการศึกษา: 2568</span>
+      <span>เวอร์ชัน Backend: Go 1.22 | GUI: PyQt6</span>
+      <span>OWASP Top 10:2025</span>
+    </div>
+  </div>
+
+  <!-- ═════════════════════��═════════════════════════ -->
+  <!-- TABLE OF CONTENTS                             -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="toc">
+    <h3>สารบัญภาคผนวก</h3>
+    <ol>
+      <li><a href="#s-usecase">ค.1 — Use Case Diagram (ไดอะแกรมกรณีการใช้งาน)</a>
+        <div class="sub-item">UC-01: ภาพรวมการใช้งานระบบ</div>
+        <div class="sub-item">UC-02: กรณีการใช้งาน Scanner Modules</div>
+      </li>
+      <li><a href="#s-sequence">ค.2 — Sequence Diagram (ไดอะแกรมลำดับ)</a>
+        <div class="sub-item">SD-01: กระบวนการ Scan หลัก (Main Scan Flow)</div>
+        <div class="sub-item">SD-02: การยืนยันตัวตนและ Session (Authentication Flow)</div>
+        <div class="sub-item">SD-03: การทดสอบ Brute Force</div>
+        <div class="sub-item">SD-04: การติดตาม Progress แบบ Real-Time</div>
+      </li>
+      <li><a href="#s-flowchart">ค.3 — Flowchart (ผังงาน)</a>
+        <div class="sub-item">FC-01: กระบวนการ Scan โดยรวม</div>
+        <div class="sub-item">FC-02: อัลกอริทึม BFS Crawler</div>
+        <div class="sub-item">FC-03: การตรวจจับ XSS (Reflected)</div>
+        <div class="sub-item">FC-04: การตรวจจับ SQL Injection (3 Phase)</div>
+        <div class="sub-item">FC-05: การคำนวณ Dynamic Risk Score</div>
+      </li>
+    </ol>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- ค.1 — USE CASE DIAGRAMS                       -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <h2 class="sec" id="s-usecase">ค.1 Use Case Diagram (ไดอะแกรมกรณีการใช้งาน)</h2>
+
+  <p>
+    Use Case Diagram แสดงปฏิสัมพันธ์ระหว่าง <strong>ผู้ใช้งาน (Actor)</strong> กับ <strong>ฟังก์ชันการทำงาน</strong>
+    ของระบบ Project Horizon VA Scanner โดยไม่ได้อ้างอิงถึงรายละเอียดการ implement ภายใน
+    แต่เน้นที่ว่าผู้ใช้งาน "สามารถทำอะไรได้บ้าง" กับระบบ
+  </p>
+
+  <!-- UC-01 -->
+  <h4 class="diag-title">UC-01: ภาพรวมการใช้งานระบบ (Overall System Use Cases)</h4>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+%%{init: {"theme": "default", "themeVariables": {"primaryColor": "#1a3a5c", "primaryTextColor": "#ffffff", "primaryBorderColor": "#0d6efd", "lineColor": "#4a5568", "secondaryColor": "#f4f7fb", "tertiaryColor": "#e8f0fe"}}}%%
+flowchart LR
+  Actor1(["👤 นักทดสอบความปลอดภัย\n(Security Tester)"])
+  Actor2(["🌐 เว็บแอปพลิเคชัน\nเป้าหมาย"])
+
+  subgraph UC["ระบบ Project Horizon VA Scanner"]
+    UC1["ตั้งค่าและเริ่มการ Scan"]
+    UC2["ดูผลการ Scan แบบ Real-Time"]
+    UC3["ยกเลิ���การ Scan"]
+    UC4["ดูรายงานช่องโหว่"]
+    UC5["ดาวน์โหลด / เปิดรายงาน"]
+    UC6["เปิดใช้งาน Authentication"]
+    UC7["เปิดใช้งาน Brute Force"]
+    UC8["กำหนด Scan Mode"]
+    UC9["เลือก Scanner Modules"]
+    UC10["ผสานรวม OWASP ZAP"]
+  end
+
+  Actor1 --> UC1
+  Actor1 --> UC2
+  Actor1 --> UC3
+  Actor1 --> UC4
+  Actor1 --> UC5
+  UC1 -.->|includes| UC6
+  UC1 -.->|includes| UC7
+  UC1 -.->|includes| UC8
+  UC1 -.->|includes| UC9
+  UC1 -.->|extends| UC10
+  UC4 -.->|includes| UC5
+  Actor2 <-.->|ถูกสแกน| UC1
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-1: Use Case Diagram ภาพรวมการใช้งานระบบ Project Horizon</div>
+
+  <div class="desc-box">
+    <div class="label">คำอธิบาย</div>
+    <ul>
+      <li><strong>ตั้งค่าและเริ่มการ Scan</strong> — ผู้ใช้กรอก URL เป้าหมาย, เลือก Module ที่ต้องการ, กำหนดค่า MaxPages/MaxDepth/Delay และกดปุ่ม Start Scan GUI จะส่ง <code>POST /scan</code> พร้อม JSON body ไปยัง Backend</li>
+      <li><strong>ดูผลการ Scan แบบ Real-Time</strong> — ระหว่างการ Scan GUI จะ poll <code>GET /progress</code> และ <code>GET /logs</code> ทุก 1 วินาที เพื่อแสดง phase ปัจจุบัน, เปอร์เซ็นต์ความคืบหน้า และ log messages</li>
+      <li><strong>ยกเลิกการ Scan</strong> — ผู้ใช้กดปุ่ม Cancel → GUI ส่ง <code>POST /cancel</code> → Backend เรียก <code>context.CancelFunc</code> เพื่อหยุดทุก goroutine ทันที</li>
+      <li><strong>ดูรายงาน/ดาวน์โหลด</strong> — หลัง Scan เสร็จ GUI แสดงรายการ Findings และปุ่ม Open Report สำหรับ JSON, HTML, PDF</li>
+      <li><strong>extends UC10 (ZAP)</strong> — การใช้งาน OWASP ZAP เป็น optional extension ต้องการให้ ZAP daemon ทำงานอยู่ก่อน</li>
+    </ul>
+  </div>
+
+  <table class="info-table">
+    <thead><tr><th>Use Case</th><th>Actor</th><th>API Endpoint</th><th>เงื่อนไขเบื้องต้น</th></tr></thead>
+    <tbody>
+      <tr><td>ตั้งค่าและเริ่มการ Scan</td><td>Security Tester</td><td>POST /scan</td><td>Backend Server ทำงานอยู่ที่ port 5500</td></tr>
+      <tr><td>ดูผล Real-Time</td><td>Security Tester</td><td>GET /progress, GET /logs</td><td>การ Scan กำลังดำเนินอยู่</td></tr>
+      <tr><td>ยกเลิกการ Scan</td><td>Security Tester</td><td>POST /cancel</td><td>การ Scan กำลังดำเนินอยู่</td></tr>
+      <tr><td>เปิดใช้งาน Authentication</td><td>Security Tester</td><td>POST /scan (auth.enabled=true)</td><td>เว็บเป้าหมายมีหน้า Login</td></tr>
+      <tr><td>เปิดใช้งาน Brute Force</td><td>Security Tester</td><td>POST /scan (brute_force.enabled=true)</td><td>มี username/password list</td></tr>
+      <tr><td>ผสานรวม OWASP ZAP</td><td>Security Tester</td><td>POST /scan (options.zap=true)</td><td>OWASP ZAP daemon รันอยู่</td></tr>
+    </tbody>
+  </table>
+
+  <hr class="sec-div">
+
+  <!-- UC-02 -->
+  <h4 class="diag-title">UC-02: กรณีการใช้งาน Scanner Modules</h4>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+%%{init: {"theme": "default"}}%%
+flowchart TD
+  Engine(["⚙️ Scanner Engine\n(Internal Actor)"])
+
+  subgraph M1["A01:2025 — Broken Access Control"]
+    UC_BAC["BACScanner\nตรวจสอบ path traversal &\nForced Browsing"]
+  end
+  subgraph M2["A02:2025 — Cryptographic Failures"]
+    UC_TLS["TLSScanner\nตรวจสอบ TLS version,\ncertificate validity"]
+  end
+  subgraph M3["A03:2025 — Injection"]
+    UC_XSS["XSSScanner\nตรวจ Reflected XSS\nด้วย nonce probe"]
+    UC_SQLI["SQLiScanner\n3-Phase: Error, Boolean,\nTime-based"]
+    UC_CMD["CMDiScanner\nตรวจ OS Command Injection\nผ่าน query parameters"]
+  end
+  subgraph M4["A04:2025 — Insecure Design"]
+    UC_MISC["MisconfigScanner\nตรวจ HTTP methods ที่เปิดเกิน,\nDirectory Listing"]
+  end
+  subgraph M5["A05–A06:2025 — Security Misconfig"]
+    UC_HDR["HeaderScanner\nตรวจ security headers:\nCSP, HSTS, X-Frame, etc."]
+    UC_CVE["CVEScanner\nตรวจ software version\nใน response headers"]
+  end
+  subgraph M6["A07:2025 — Auth Failures"]
+    UC_BF["BruteForce Module\nทดสอบ credential list\nตรวจจับ weak passwords"]
+  end
+  subgraph M7["ZAP Integration"]
+    UC_ZAP["ZAPScanner\nส่ง URL ให้ OWASP ZAP\nทำ Active Scan"]
+  end
+
+  Engine --> UC_BAC
+  Engine --> UC_TLS
+  Engine --> UC_XSS
+  Engine --> UC_SQLI
+  Engine --> UC_CMD
+  Engine --> UC_MISC
+  Engine --> UC_HDR
+  Engine --> UC_CVE
+  Engine --> UC_BF
+  Engine --> UC_ZAP
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-2: Use Case Diagram แสดงการทำงานของ Scanner Modules ทั้ง 9 โมดูล</div>
+
+  <div class="desc-box">
+    <div class="label">คำอธิบาย</div>
+    <p>Scanner Engine ทำหน้าที่เป็น <em>Internal Actor</em> ที่เรียกใช้ plugin แต่ละตัวสำหรับทุก URL ที่ Crawler ค้นพบ
+    แต่ละ plugin implement interface <code>ScannerPlugin</code> ที่มีเพียง 2 method คือ <code>Name()</code> และ <code>Scan(ctx, url)</code>
+    ทำให้ง่ายต่อการเพิ่ม/ลด module โดยไม่กระทบส่วนอื่น</p>
+  </div>
+
+  <table class="info-table">
+    <thead><tr><th>Module</th><th>OWASP</th><th>Severity สูงสุด</th><th>รายละเอียดการตรวจสอบ</th></tr></thead>
+    <tbody>
+      <tr><td>HeaderScanner</td><td>A02, A06</td><td><span class="badge badge-h">High</span></td><td>CSP, HSTS, X-Frame-Options, X-Content-Type, Permissions-Policy, Referrer-Policy, X-XSS-Protection</td></tr>
+      <tr><td>MisconfigScanner</td><td>A02, A05</td><td><span class="badge badge-h">High</span></td><td>HTTP OPTIONS method, DELETE/PUT/TRACE enabled, Directory Listing, Error disclosure</td></tr>
+      <tr><td>TLSScanner</td><td>A02, A04</td><td><span class="badge badge-c">Critical</span></td><td>TLS 1.0/1.1, expired cert, self-signed, weak cipher suites</td></tr>
+      <tr><td>XSSScanner</td><td>A03</td><td><span class="badge badge-h">High</span></td><td>Reflected XSS ผ่าน URL parameters ด้วย nonce probe + CSP bypass check</td></tr>
+      <tr><td>SQLiScanner</td><td>A03</td><td><span class="badge badge-c">Critical</span></td><td>Error-based (phase 1), Boolean-based (phase 2), Time-based (phase 3, FullScan)</td></tr>
+      <tr><td>CMDiScanner</td><td>A03</td><td><span class="badge badge-c">Critical</span></td><td>OS Command Injection ผ่าน URL params ด้วย time-delay และ error-pattern detection</td></tr>
+      <tr><td>CVEScanner</td><td>A06</td><td><span class="badge badge-h">High</span></td><td>Banner matching: Server, X-Powered-By, X-AspNet-Version headers กับ known vulnerable versions</td></tr>
+      <tr><td>BACScanner</td><td>A01</td><td><span class="badge badge-h">High</span></td><td>Forced Browsing sensitive paths: /admin, /backup, /.env, /config, /api/internal</td></tr>
+      <tr><td>ZAPScanner</td><td>A01–A05</td><td><span class="badge badge-c">Critical</span></td><td>OWASP ZAP Spider + Active Scan API integration, รับ findings จาก ZAP alerts</td></tr>
+    </tbody>
+  </table>
+
+  <hr class="sec-div">
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- ค.2 — SEQUENCE DIAGRAMS                       -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <h2 class="sec" id="s-sequence">ค.2 Sequence Diagram (ไดอะแกรมลำดับ)</h2>
+
+  <p>
+    Sequence Diagram แสดงการส่งผ่านข้อความ (message passing) ระหว่าง component ต่าง ๆ ของระบบ
+    ตามลำดับเวลา เพื่อให้เห็นการไหลของข้อมูลและการตอบสนองของแต่ละส่วนในแต่ละสถานการณ์
+  </p>
+
+  <!-- SD-01 -->
+  <h3 class="sub">SD-01: กระบวนการ Scan หลัก (Main Scan Flow)</h3>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U  as 👤 User (GUI)
+  participant API as Backend API<br/>(Gin HTTP :5500)
+  participant ENG as Scanner Engine
+  participant CRL as Crawler (BFS)
+  participant PLG as Plugins (9 modules)
+  participant TGT as Target Website
+  participant RPT as Report Service
+
+  U->>API: POST /scan<br/>{target, options, auth, modes}
+  API->>API: Validate & Clamp params<br/>(MaxPages 1–200, MaxDepth 1–4)
+  API->>ENG: NewEngine(req).Run(ctx)
+
+  Note over ENG: Phase: crawling
+
+  ENG->>CRL: RunWithContext(ctx)
+  loop BFS จนครบ MaxPages หรือ MaxDepth
+    CRL->>TGT: GET page (HTTP)
+    TGT-->>CRL: HTML response
+    CRL->>CRL: Extract hrefs, filter same-host
+  end
+  CRL-->>ENG: []URLInfo (all discovered URLs)
+
+  Note over ENG: Phase: scanning
+
+  loop สำหรับแต่ละ URL (max 10 goroutines คู่ขนาน)
+    ENG->>PLG: Scan(ctx, url) — เรียกทุก plugin
+    PLG->>TGT: HTTP probes (payloads, checks)
+    TGT-->>PLG: HTTP responses
+    PLG-->>ENG: []Finding (0 หรือมากกว่า)
+  end
+
+  ENG->>ENG: Deduplicate findings<br/>key = Type|URL|Evidence
+  ENG->>ENG: calcRiskScores()<br/>OWASP-inspired formula
+  ENG->>ENG: Sort by RiskScore DESC
+
+  Note over ENG: Phase: reporting
+
+  ENG->>RPT: GenerateArtifacts(findings, stats, formats)
+  RPT-->>ENG: []ReportArtifact {json, html, pdf}
+  ENG-->>API: ScanResponse {findings, stats, reports}
+  API-->>U: HTTP 200 JSON<br/>{scan_id, findings, stats, reports}
+  U->>U: แสดงผล Dashboard + ปุ่ม Open Report
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-3: Sequence Diagram แสดงกระบวนการ Scan หลักตั้งแต่รับ Request จนส่งผล Response</div>
+
+  <div class="desc-box">
+    <div class="label">จุดสำคัญ</div>
+    <ul>
+      <li><strong>ขั้นตอน 1–3:</strong> Backend รับ JSON, ตรวจสอบและปรับค่าขอบเขต จากนั้นสร้าง Engine instance</li>
+      <li><strong>ขั้นตอน 4–9 (Crawl):</strong> Crawler ทำ BFS เก็บทุก URL ที่อยู่บน hostname เดียวกัน รองรับ SPA hash routes (<code>#/route</code>)</li>
+      <li><strong>ขั้นตอน 10–14 (Scan):</strong> แต่ละ URL ถูกส่งใ���้ plugin ทุกตัวผ่า��� goroutine (สูงสุด 10 ตัวพร้อมกัน) ป้องกัน race condition ด้วย mutex</li>
+      <li><strong>ขั้นตอน 15–17:</strong> Dedup → RiskScore → Sort ทำตามลำดับหลัง goroutine ทุกตัวเสร็จ (<code>wg.Wait()</code>)</li>
+      <li><strong>ขั้นตอน 18–21 (Report):</strong> สร้างไฟล์ report ใน <code>reports/{scan_id}/</code> และส่ง path กลับใน ScanResponse</li>
+    </ul>
+  </div>
+
+  <hr class="sec-div">
+
+  <!-- SD-02 -->
+  <h3 class="sub">SD-02: การยืนยันตัวตนและ Session (Authentication Flow)</h3>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U  as 👤 User (GUI)
+  participant API as Backend API
+  participant ENG as Scanner Engine
+  participant AUTH as performLogin()
+  participant TGT as Target Website
+  participant HC  as httpclient<br/>(Shared HTTP Client)
+
+  U->>API: POST /scan<br/>{auth: {enabled:true, login_url, username, password}}
+  API->>API: Validate auth fields<br/>(username format, password >= 8 chars)
+  API->>ENG: Run(ctx) — auth.Enabled = true
+
+  ENG->>AUTH: performLogin(auth)
+  AUTH->>TGT: GET {login_url}
+  TGT-->>AUTH: HTML (login form)
+  AUTH->>AUTH: Parse form — ค้นหา:<br/>1) explicit field names (auth config)<br/>2) input[type=email] / input[type=password]<br/>3) name contains user/email/pass<br/>4) CSRF hidden inputs
+  AUTH->>TGT: POST {form action}<br/>Content-Type: application/x-www-form-urlencoded<br/>{username=..., password=..., _csrf=...}
+  TGT-->>AUTH: HTTP 302 Redirect + Set-Cookie: session=...
+  AUTH-->>ENG: CookieJar (with session cookies)
+
+  ENG->>HC: SetSessionJar(jar)
+  Note over HC: ทุก HTTP request ต่อจากนี้<br/>จะพ่วง session cookie โดยอัตโนมัติ
+
+  ENG->>ENG: Crawl + Scan (ด้วย session cookies)
+  Note over ENG: ตรวจสอบ authenticated pages ได้<br/>เช่น /dashboard, /admin
+
+  ENG->>HC: SetSessionJar(nil)  [defer, หลัง Scan เสร็จ]
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-4: Sequence Diagram แสดงกระบวนการ Form-Based Authentication และการใช้ Session Cookies</div>
+
+  <div class="desc-box">
+    <div class="label">คำอธิบาย</div>
+    <ul>
+      <li><strong>Auto-detect form fields:</strong> ระบบค้นหา username/password field ด้วยลำดับความสำคัญ 4 ระดับ ไม่จำเป็นต้องกำหนด field name เอง</li>
+      <li><strong>CSRF Token:</strong> ระบบ parse <code>&lt;input type="hidden"&gt;</code> ทุกตัวในฟอร์ม และส่งไปพร้อม POST เพื่อ bypass CSRF protection</li>
+      <li><strong>Shared CookieJar:</strong> <code>httpclient.SetSessionJar()</code> ทำให้ plugin ทุกตัวใช้ session เดียวกัน ผ่าน HTTP client ที่แชร์ร่วมกัน</li>
+      <li><strong>Cleanup:</strong> <code>defer SetSessionJar(nil)</code> ล้าง session เมื่อ Scan เสร็จ เพื่อไม่ให้ session หลุดไปยัง Scan ครั้งถัดไป</li>
+    </ul>
+  </div>
+
+  <hr class="sec-div">
+
+  <!-- SD-03 -->
+  <h3 class="sub">SD-03: การทดสอบ Brute Force Credential Attack</h3>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant ENG as Scanner Engine
+  participant BF  as runBruteForce()
+  participant TGT as Target Login Endpoint
+  participant RPT as Findings Collector
+
+  ENG->>BF: runBruteForce(ctx, bruteForceConfig)
+  BF->>TGT: GET {login_url}  [ดึง form สำหรับ auto-detect fields]
+  TGT-->>BF: HTML form
+
+  loop สำหรับแต่ละ (username × password) pair<br/>จนครบ MaxAttempts หรือ StopOnSuccess
+    BF->>BF: sleep(DelayMs)  [min 100ms]
+    BF->>TGT: POST credentials
+    TGT-->>BF: HTTP Response
+
+    alt Signal 1: Status Code เปลี่ยน (302/200 → login success)
+      BF->>RPT: Create Finding (Critical) — "Successful Login"
+    else Signal 2: Response body เปลี่ยนอย่างมีนัย (> threshold)
+      BF->>RPT: Create Finding (Critical) — "Probable Login"
+    else Signal 3: Redirect ไปยัง URL ที่ต่างจาก login page
+      BF->>RPT: Create Finding (Critical) — "Login Redirect Detected"
+    else ล้มเหลว
+      BF->>BF: บันทึก failed attempt
+    end
+
+    opt StopOnSuccess = true AND ประสบความสำเร็จ
+      BF->>BF: break loop
+    end
+  end
+
+  BF-->>ENG: []Finding (brute force results)<br/>OWASP A07:2025, CWE-307/521
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-5: Sequence Diagram แสดงกระบวนการ Brute Force Testing ด้วย 3-Signal Detection</div>
+
+  <div class="desc-box">
+    <div class="label">คำอธิบาย 3-Signal Detection</div>
+    <ul>
+      <li><strong>Signal 1 — Status Code:</strong> หาก login สำเร็จ server มักตอบด้วย <code>302 Found</code> (redirect) แทน <code>200</code> หรือ login page ซ้ำ</li>
+      <li><strong>Signal 2 — Body Change:</strong> เปรียบเทียบ response body size/content กับ baseline (failed login) หากต่างกันมากกว่า threshold → probable success</li>
+      <li><strong>Signal 3 — Redirect Target:</strong> ตรวจว่า <code>Location</code> header ชี้ไปยัง URL ที่ต่างจาก login page (เช่น <code>/dashboard</code>)</li>
+      <li><strong>Safety caps:</strong> <code>MaxAttempts</code> สูงสุด 500, <code>DelayMs</code> ต่ำสุด 100ms เพื่อป้องกัน accidental DoS</li>
+    </ul>
+  </div>
+
+  <hr class="sec-div">
+
+  <!-- SD-04 -->
+  <h3 class="sub">SD-04: การติดตาม Progress แบบ Real-Time และการยกเลิก Scan</h3>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+sequenceDiagram
+  autonumber
+  participant U   as 👤 User (GUI)
+  participant API as Backend API
+  participant ENG as Scanner Engine
+  participant CTX as context.Context
+
+  U->>API: POST /scan  [เริ่ม Scan — async ใน goroutine]
+  API->>CTX: context.WithCancel(req.Context)
+  API->>ENG: SetGlobalCancel(cancelFn)
+  API->>ENG: engine.Run(scanCtx)  [non-blocking return to GUI]
+
+  loop ทุก 1 วินาที ระหว่าง Scan
+    U->>API: GET /progress
+    API-->>U: {phase:"scanning", done:5, total:10, percent:52.5}
+    U->>API: GET /logs?after=N
+    API-->>U: {lines:["[Engine] headers -> /page1", ...], next:N+3}
+  end
+
+  Note over U: ผู้ใช้กดปุ่ม Cancel
+
+  U->>API: POST /cancel
+  API->>ENG: CancelCurrentScan()
+  ENG->>CTX: cancelFn()  [ส่ง cancel signal]
+  CTX-->>ENG: ctx.Err() != nil (ใน goroutines ทุกตัว)
+  ENG->>ENG: goroutines ทุกตัวหยุดทำงาน
+  ENG-->>API: ScanResponse (partial results)
+  API-->>U: HTTP 200 {partial findings}
+  API->>ENG: SetGlobalCancel(nil)  [defer cleanup]
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-6: Sequence Diagram แสดงการติดตาม Real-Time Progress และการยกเลิก Scan</div>
+
+  <div class="desc-box">
+    <div class="label">คำอธิบายเพิ่มเติม</div>
+    <ul>
+      <li><strong>Phase ของ Progress:</strong> ระบบรายงาน 4 phases — <code>idle</code> (0%), <code>crawling</code> (5%), <code>scanning</code> (10%–95%), <code>reporting</code> (98%)</li>
+      <li><strong>Log Streaming:</strong> <code>GET /logs?after=N</code> ส่งคืนเฉพาะ log lines ใหม่ที่เพิ่มขึ้นหลัง index N ทำให้ไม่ต้องส่ง log ซ้ำ</li>
+      <li><strong>Global Cancel:</strong> <code>engine.SetGlobalCancel()</code> เก็บ cancel function ไว้ใน global variable ที่ป้องกันด้วย mutex ทำให้ <code>POST /cancel</code> สามารถหยุด Scan ได้จากภายนอก</li>
+      <li><strong>TimedMode:</strong> หาก Scan mode = Timed จะใช้ <code>context.WithTimeout()</code> แทนการ cancel ด้วยมือ โดย timeout สูงสุดคือ 3600 วินาที</li>
+    </ul>
+  </div>
+
+  <hr class="sec-div">
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- ค.3 — FLOWCHARTS                              -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <h2 class="sec" id="s-flowchart">ค.3 Flowchart (ผังงาน)</h2>
+
+  <p>
+    Flowchart แสดงลำดับขั้นตอนการทำงานของอัลกอริทึมและกระบวนการสำคัญภายในระบบ
+    รวมถึงเงื่อนไขการตัดสินใจ (decision) และการวนซ้ำ (loop) ในแต่ละโมดูล
+  </p>
+
+  <!-- FC-01 -->
+  <h3 class="sub">FC-01: กระบวนการ Scan โดยรวม (Overall Scan Process)</h3>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TD
+  A([🟢 เริ่มต้น]) --> B["รับ ScanRequest\n(target, options, auth, modes)"]
+  B --> C["ตรวจสอบและปรับค่า\nMaxPages 1–200, MaxDepth 1–4\nDelayMs 0–500ms"]
+  C --> D{Scan Mode?}
+
+  D -->|Normal| D1["MaxPages=30, MaxDepth=2\nใช้ request context"]
+  D -->|Timed| D2["MaxPages=∞, MaxDepth=∞\nตั้ง timeout (max 3600s)"]
+  D -->|Full Scan| D3["MaxPages=999999, MaxDepth=99\nไม่มี time limit"]
+
+  D1 & D2 & D3 --> E{Auth Enabled?}
+  E -->|Yes| F["performLogin()\nFetch form → POST creds\n→ ได้ CookieJar"]
+  F --> G["SetSessionJar(jar)\nทุก request พ่วง session cookie"]
+  G --> H{BruteForce Enabled?}
+  E -->|No| H
+
+  H -->|Yes| I["runBruteForce()\nทดสอบ username × password\nเก็บ findings (Critical)"]
+  I --> J
+  H -->|No| J
+
+  J["🕷️ Crawler.RunWithContext(ctx)\nBFS crawl — เก็บ []URLInfo"] --> K
+  K["สร้าง goroutine pool\n(max 10 concurrent)"] --> L
+
+  subgraph SCAN["🔍 Parallel Scanning"]
+    L["For each URL"] --> M["For each enabled Plugin"]
+    M --> N["Plugin.Scan(ctx, url)\n→ []Finding"]
+    N --> O["Merge ลง shared slice\n(mutex protected)"]
+    O -->|ยัง| L
+  end
+
+  O --> P["Merge BruteForce findings"]
+  P --> Q["Deduplicate\nkey = Type|URL|Evidence"]
+  Q --> R["calcRiskScores()\nOWASP-Inspired Formula"]
+  R --> S["Sort by RiskScore DESC\nCVSSScore as tiebreaker"]
+  S --> T["calculateStats()\nCritical/High/Medium/Low counts"]
+  T --> U2["GenerateArtifacts()\nJSON + HTML + PDF reports"]
+  U2 --> V["Return ScanResponse\n{scan_id, findings, stats, reports}"]
+  V --> Z([🔴 สิ้นสุด])
+
+  style A fill:#1a7a4a,color:#fff,stroke:#1a7a4a
+  style Z fill:#c0392b,color:#fff,stroke:#c0392b
+  style SCAN fill:#f4f7fb,stroke:#0d6efd
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-7: Flowchart แสดงกระบวนการทำงานทั้งหมดของ Scanner Engine ตั้งแต่รับ Request จนเสร็จสิ้น</div>
+
+  <div class="desc-box">
+    <div class="label">อธิบายการทำงาน Step by Step</div>
+    <ol>
+      <li><strong>ขั้นที่ 1 — รับและตรวจสอบ Request:</strong> ระบบรับ ScanRequest จาก GUI แล้วตรวจสอบและปรับค่าให้อยู่ในขอบเขตที่ปลอดภัย ได้แก่ MaxPages (1–200), MaxDepth (1–4) และ RequestDelayMs (0–500 ms)</li>
+      <li><strong>ขั้นที่ 2 — เลือก Scan Mode:</strong> ระบบแยกเส้นทางการทำงานตามโหมดที่เลือก โดย Normal Mode จำกัดหน้าและความลึก, Timed Mode ใช้ time limit สูงสุด 3,600 วินาที และ Full Scan Mode ไม่จำกัดทั้งหน้าและความลึก</li>
+      <li><strong>ขั้นที่ 3 — Authentication (ถ้าเปิดใช้งาน):</strong> ระบบเรียก <code>performLogin()</code> เพื่อ login ไปยังเว็บเป้าหมายและเก็บ session cookies ไว้ใน CookieJar ซึ่ง HTTP client ทุกตัวในระบบจะนำไปใช้ร่วมกันโดยอัตโนมัติ</li>
+      <li><strong>ขั้นที่ 4 — Brute Force (ถ้าเปิดใช้งาน):</strong> ระบบเรียก <code>runBruteForce()</code> เพื่อทดสอบรหัสผ่านจากรายการที่กำหนด โดยใช้ 3-Signal Detection และบันทึกผลเป็น Critical findings ก่อนเริ่ม crawl</li>
+      <li><strong>ขั้นที่ 5 — Crawling:</strong> Crawler ทำ BFS โดยเริ่มจาก URL เป้าหมายและขยายไปยัง URL อื่น ๆ ที่อยู่บน hostname เดียวกัน ผลลัพธ์คือ <code>[]URLInfo</code> ที่มี URL และ depth ของแต่ละหน้า</li>
+      <li><strong>ขั้นที่ 6 — Parallel Scanning:</strong> ระบบสร้าง goroutine pool (สูงสุด 10 ตัวพร้อมกัน) โดยแต่ละ goroutine รับ URL หนึ่งหน้าแล้วส่งให้ plugin ทุกตัวที่เปิดใช้งานทำการตรวจสอบตามลำดับ ผลลัพธ์จากทุก goroutine ถูกรวมเข้าใน shared slice ที่ป้องกันด้วย mutex</li>
+      <li><strong>ขั้นที่ 7 — Deduplicate:</strong> ระบบกรอง findings ที่ซ้ำกันออกโดยใช้ key ที่ประกอบด้วย <code>Type|TargetURL|Evidence</code> เพื่อให้รายงานไม่มีช่องโหว่ซ้ำซ้อน</li>
+      <li><strong>ขั้นที่ 8 — คำนวณ Risk Score:</strong> ระบบเรียก <code>calcRiskScores()</code> เพื่อคำนวณคะแนนความเสี่ยงแบบไดนามิกให้กับ findings แต่ละประเภท โดยใช้สูตร OWASP-Inspired ที่อ้างอิง incidence rate, exploit score และ impact score</li>
+      <li><strong>ขั้นที่ 9 — เรียงลำดับ:</strong> ระบบเรียง findings ตาม RiskScore จากมากไปน้อย โดยใช้ CVSSScore เป็นตัวแบ่งเมื่อคะแนนเท่ากัน ทำให้ช่องโหว่ที่รุนแรงที่สุดปรากฏก่อนเสมอ</li>
+      <li><strong>ขั้นที่ 10 — สร้างรายงาน:</strong> ระบบเรียก <code>GenerateArtifacts()</code> เพื่อสร้างไฟล์รายงานในรูปแบบ JSON, HTML และ PDF พร้อม Executive Summary, Methodology, Findings Table และ Conclusions บันทึกไว้ใน <code>reports/{scan_id}/</code></li>
+      <li><strong>ขั้นที่ 11 — ส่งผลกลับ:</strong> ระบบส่ง ScanResponse ที่ประกอบด้วย scan_id, findings, สถิติ (Critical/High/Medium/Low) และ path ของไฟล์รายงานกลับไปยัง GUI ผ่าน HTTP 200</li>
+    </ol>
+  </div>
+
+  <hr class="sec-div">
+
+  <!-- FC-02 -->
+  <h3 class="sub">FC-02: อัลกอริทึม BFS Crawler</h3>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TD
+  A([เริ่มต้น]) --> B["กำหนดค่าเริ่มต้น\nqueue = [StartURL, depth=0]\nvisited = {}  results = []"]
+  B --> C{Queue ว่าง\nหรือ results >= MaxPages?}
+  C -->|Yes| Z([คืนค่า results])
+  C -->|No| D["Dequeue node\n(url, depth)"]
+
+  D --> E["Normalize URL\n(ตัด #anchor, session params)"]
+  E --> F{Already\nvisited?}
+  F -->|Yes| C
+  F -->|No| G["Mark visited[url] = true\nAppend to results"]
+
+  G --> H{depth >= MaxDepth?}
+  H -->|Yes — ไม่ขยายต่อ| C
+  H -->|No| I["fetchLinks(ctx, url)\nHTTP GET → parse href="]
+
+  I --> J["สำหรับแต่ละ link ที่พบ"]
+  J --> K["toAbsoluteURL(base, link)\nแปลงเป็น absolute URL"]
+  K --> L{Same host\nเหมือน StartURL?}
+  L -->|No — ข้าม| J
+  L -->|Yes| M{Already\nvisited?}
+  M -->|Yes — ข้าม| J
+  M -->|No| N{SPA Hash Route?\ne.g. href='#/route'}
+  N -->|Yes| O["เพิ่ม URL ใน results โดยตรง\n(ไม่ต้อง fetch — server คืน HTML เหมือนกัน)"]
+  N -->|No| P["Enqueue\n(url, depth+1)"]
+  O --> J
+  P --> J
+  J -->|ครบทุก link| C
+
+  style A fill:#1a7a4a,color:#fff,stroke:#1a7a4a
+  style Z fill:#0d6efd,color:#fff,stroke:#0d6efd
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-8: Flowchart แสดงอัลกอริทึม BFS (Breadth-First Search) ของ Web Crawler รองรับ SPA Hash Routes</div>
+
+  <div class="desc-box">
+    <div class="label">อธิบายการทำงาน Step by Step</div>
+    <ol>
+      <li><strong>ขั้นที่ 1 — เริ่มต้น:</strong> กำหนดค่าเริ่มต้นโดยใส่ StartURL ลงใน queue ที่ depth=0 พร้อมสร้าง map <code>visited</code> สำหรับป้องกัน URL ซ้ำ และ slice <code>results</code> สำหรับเก็บผลลัพธ์</li>
+      <li><strong>ขั้นที่ 2 — ตรวจสอบเงื่อนไขหยุด:</strong> ก่อนประมวลผล URL แต่ละตัว ระบบตรวจสอบว่า queue ว่างหรือจำนวน results ถึง MaxPages แล้วหรือไม่ ถ้าใช่ให้หยุดและคืนค่า results ทันที</li>
+      <li><strong>ขั้นที่ 3 — นำ URL ออกจาก Queue:</strong> Dequeue URL ตัวแรกจาก queue แล้วทำ URL normalization โดยตัด fragment anchor (<code>#section</code>) และ session/token query parameters ออก เพื่อให้ได้ key สำหรับตรวจสอบ URL ซ้ำ</li>
+      <li><strong>ขั้นที่ 4 — ตรวจสอบ URL ซ้ำ:</strong> หาก URL นี้เคยถูก visit แล้ว ให้ข้ามไปขั้นที่ 2 โดยไม่ประมวลผล มิฉะนั้น mark ว่า visited และเพิ่มลง results</li>
+      <li><strong>ขั้นที่ 5 — ตรวจสอบ Depth:</strong> หาก depth ของ URL นี้ถึง MaxDepth แล้ว ให้หยุดขยาย link จาก URL นี้ (เพิ่ม URL ใน results แล้วแต่ไม่ enqueue link ต่อ) กลับไปขั้นที่ 2</li>
+      <li><strong>ขั้นที่ 6 — ดึง Links:</strong> เรียก <code>fetchLinks()</code> เพื่อส่ง HTTP GET ไปยัง URL นั้น แล้ว parse HTML เพื่อดึงทุก <code>href=</code> ออกมา รวมทั้ง SPA hash routes (href="#/route") โดยข้าม javascript: และ mailto:</li>
+      <li><strong>ขั้นที่ 7 — กรองแต่ละ Link:</strong> สำหรับแต่ละ link ที่พบ ระบบแปลงเป็น absolute URL จากนั้นกรอง 3 เงื่อนไข ได้แก่ (1) ต้องอยู่บน hostname เดียวกับ StartURL, (2) ยังไม่ถูก visit และ (3) ไม่ใช่ SPA hash route</li>
+      <li><strong>ขั้นที่ 8 — จัดการ SPA Hash Route:</strong> หาก link เป็น SPA hash route (fragment ขึ้นต้นด้วย "/") ให้เพิ่ม URL นั้นลง results โดยตรงโดยไม่ต้อง fetch ใหม่ เนื่องจาก server คืน HTML เดิมสำหรับทุก hash route</li>
+      <li><strong>ขั้นที่ 9 — Enqueue:</strong> หาก link ผ่านทุกเงื่อนไข ให้ enqueue โดยเพิ่ม depth+1 เพื่อรอประมวลผลในรอบถัดไป แล้ววนกลับไปขั้นที่ 2</li>
+    </ol>
+  </div>
+
+  <div class="desc-box">
+    <div class="label">คำอธิบายพิเศษ</div>
+    <ul>
+      <li><strong>SPA Hash Route:</strong> เว็บ framework อย่าง Angular, React, Vue ที่ใช้ HashRouter จะมี URL รูปแบบ <code>/#/dashboard</code> ระบบตรวจจับและเพิ่ม URL เหล่านี้ลง results โดยตรงโดยไม่ต้อง fetch ใหม่ เพราะ server คืน HTML เดิมเสมอ</li>
+      <li><strong>URL Normalization:</strong> ตัด fragment (<code>#section</code>), session token query params เพื่อไม่นับ URL เดียวกันหลายครั้ง แต่คง SPA fragment (<code>#/route</code>) ไว้</li>
+      <li><strong>Same-host filter:</strong> เปรียบเทียบ hostname (case-insensitive) ป้องกันการ crawl ออกนอก domain เป้าหมาย</li>
+    </ul>
+  </div>
+
+  <hr class="sec-div">
+
+  <!-- FC-03 -->
+  <h3 class="sub">FC-03: การตรวจจับ Reflected XSS</h3>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TD
+  A([เริ่มต้น XSSScanner]) --> B["รับ URLInfo\n(url, depth)"]
+  B --> C["Parse URL\nดึง Query Parameters"]
+  C --> D{มี Query\nParameters?}
+  D -->|No| Z1([คืนค่า nil])
+  D -->|Yes| E["สร้าง nonce probe\n(random 8-char string)\nเช่น: xss_probe=a1b2c3d4"]
+
+  E --> F["สำหรับแต่ละ parameter"]
+  F --> G["แทนค่า parameter\nด้วย probe payload\nเช่น: ?q=a1b2c3d4"]
+  G --> H["ส่ง GET request\nไปยัง modified URL"]
+  H --> I{Response body\nมี nonce ปรากฏ?}
+
+  I -->|No — ไม่มี reflection| F
+  I -->|Yes — พบ reflection| J{อยู่ใน\nHTML context?\nscript tag, attr, etc.}
+
+  J -->|No — escaped/encoded| F
+  J -->|Yes| K{CSP Header\nมีอยู่?}
+
+  K -->|CSP present| L["สร้าง Finding: Medium\nXSS Reflected - CSP Mitigated"]
+  K -->|No CSP| M["สร้าง Finding: High\nReflected XSS Vulnerability"]
+
+  L & M --> N{FullScan Mode?}
+  N -->|Yes| O["ทดสอบ payload เพิ่มเติม\nscript alert payload\nimg onerror payload\nsvg onload payload"]
+  O --> P{Payload ปรากฏ\nใน response?}
+  P -->|Yes| Q["อัปเดต Finding\nเพิ่ม evidence payload"]
+  P -->|No| F
+  Q --> F
+  N -->|No — Normal/Timed| F
+  F -->|ครบทุก param| Z2([คืนค่า findings])
+
+  style A fill:#1a7a4a,color:#fff,stroke:#1a7a4a
+  style Z1 fill:#4a5568,color:#fff,stroke:#4a5568
+  style Z2 fill:#0d6efd,color:#fff,stroke:#0d6efd
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-9: Flowchart แสดงการทำงานของ XSS Scanner ด้วย Nonce Probe และ CSP Detection</div>
+
+  <div class="desc-box">
+    <div class="label">อธิบายการทำงาน Step by Step</div>
+    <ol>
+      <li><strong>ขั้นที่ 1 — รับ URLInfo และ Parse:</strong> XSSScanner รับ URL จาก Engine แล้ว parse เพื่อดึง query parameters ทั้งหมด หาก URL ไม่มี query parameters ให้หยุดและคืนค่า nil ทันที เพราะ reflected XSS ต้องการ input vector</li>
+      <li><strong>ขั้นที่ 2 — สร้าง Nonce Probe:</strong> ระบบสร้างสตรีงสุ่ม 8 ตัวอักษร (nonce) เช่น <code>a1b2c3d4</code> ที่ไม่ใช่ XSS payload แต่ใช้เพื่อตรวจสอบว่าค่าที่ส่งไปถูก reflect กลับมาในหน้าเว็บหรือไม่โดยไม่ทริกเกอร์ WAF</li>
+      <li><strong>ขั้นที่ 3 — ทดสอบแต่ละ Parameter:</strong> สำหรับแต่ละ query parameter ระบบแทนที่ค่าด้วย nonce probe แล้วส่ง GET request ไปยัง URL ที่แก้ไขแล้ว</li>
+      <li><strong>ขั้นที่ 4 — ตรวจสอบ Reflection:</strong> ระบบตรวจสอบว่า nonce ปรากฏใน response body หรือไม่ หากไม่พบ แสดงว่า server ไม่ได้ reflect input กลับมา จึงข้ามไปทดสอบ parameter ถัดไป</li>
+      <li><strong>ขั้นที่ 5 — ตรวจสอบ HTML Context:</strong> หาก nonce ถูก reflect กลับมา ระบบตรวจสอบว่าค่านั้นอยู่ใน HTML context ที่อันตรายหรือไม่ เช่น ภายใน script tag, attribute value หรือ event handler ถ้าถูก encode/escape แล้วถือว่าปลอดภัยและข้ามไป</li>
+      <li><strong>ขั้นที่ 6 — ตรวจสอบ CSP Header:</strong> ระบบตรวจสอบว่า response มี Content-Security-Policy header หรือไม่ ถ้ามี CSP จะสร้าง Finding ระดับ Medium เนื่องจาก CSP ช่วยลดความเสี่ยง ถ้าไม่มี CSP จะสร้าง Finding ระดับ High</li>
+      <li><strong>ขั้นที่ 7 — FullScan Mode (ถ้าเปิด):</strong> หาก Scan Mode เป็น Full Scan ระบบจะทดสอบ XSS payload จริงเพิ่มเติม เช่น script alert payload, img onerror payload และ svg onload payload เพื่อยืนยันว่าช่องโหว่สามารถ exploit ได้จริง</li>
+      <li><strong>ขั้นที่ 8 — ตรวจสอบ Payload Reflection:</strong> หาก payload ถูก reflect กลับมาโดยไม่ถูก sanitize ระบบอัปเดต evidence ใน Finding ด้วย payload จริง เพื่อให้รายงานมีหลักฐานชัดเจน</li>
+      <li><strong>ขั้นที่ 9 — คืนค่า Findings:</strong> หลังทดสอบครบทุก parameter แล้ว คืนค่า findings ทั้งหมดที่พบกลับไปยัง Engine</li>
+    </ol>
+  </div>
+
+  <hr class="sec-div">
+
+  <!-- FC-04 -->
+  <h3 class="sub">FC-04: การตรวจจับ SQL Injection (3-Phase Detection)</h3>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TD
+  A([เริ่มต้น SQLiScanner]) --> B["รับ URLInfo"]
+  B --> C{มี Query Parameters\nหรือ Form Fields?}
+  C -->|No| Z1([คืนค่า nil])
+  C -->|Yes| D
+
+  subgraph P1["Phase 1 — Error-Based Detection"]
+    D["Inject single quote\nเข้าแต่ละ parameter"] --> E["ส่ง GET/POST request"]
+    E --> F{Response มี SQL Error Pattern?\nORA- / MySQL Error\nSyntax Error / SQLSTATE}
+    F -->|Yes| G["สร้าง Finding: Critical\nSQL Injection Error-Based\nevidence = error message"]
+    F -->|No| H
+  end
+
+  subgraph P2["Phase 2 — Boolean-Based Detection"]
+    H["Inject TRUE condition\ne.g. 1=1"] --> I["ส่ง request → บันทึก response A"]
+    I --> J["Inject FALSE condition\ne.g. 1=2"] --> K["ส่ง request → บันทึก response B"]
+    K --> L{Response A และ B\nต่างกันอย่างมีนัย\nlength diff > threshold?}
+    L -->|Yes| M["สร้าง Finding: Critical\nSQL Injection Boolean-Based"]
+    L -->|No| N
+  end
+
+  subgraph P3["Phase 3 — Time-Based (FullScan Only)"]
+    N{FullScan\nMode?} -->|No| Z2
+    N -->|Yes| O["Inject time-delay payload\nSLEEP(5) หรือ WAITFOR DELAY"]
+    O --> P["ส่ง request + วัดเวลา response"]
+    P --> Q{Response time\n> 4.5 วินาที?}
+    Q -->|Yes| R["สร้าง Finding: Critical\nSQL Injection Time-Based"]
+    Q -->|No| Z2
+  end
+
+  G & M & R --> Z2([คืนค่า findings])
+
+  style A fill:#1a7a4a,color:#fff,stroke:#1a7a4a
+  style Z1 fill:#4a5568,color:#fff,stroke:#4a5568
+  style Z2 fill:#0d6efd,color:#fff,stroke:#0d6efd
+  style P1 fill:#fde8e8,stroke:#c0392b
+  style P2 fill:#fef3e2,stroke:#d68910
+  style P3 fill:#e8f0fe,stroke:#0d6efd
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-10: Flowchart แสดงการทำงานของ SQLi Scanner แบบ 3 Phase — Error, Boolean, และ Time-Based</div>
+
+  <div class="desc-box">
+    <div class="label">อธิบายการทำงาน Step by Step</div>
+    <ol>
+      <li><strong>ขั้นที่ 1 — ตรวจสอบ Input Vector:</strong> SQLiScanner รับ URL จาก Engine แล้วตรวจสอบว่ามี query parameters หรือ form fields ที่สามารถใช้เป็นช่องทาง injection ได้หรือไม่ ถ้าไม่มีให้หยุดทันที</li>
+      <li><strong>ขั้นที่ 2 — Phase 1 (Error-Based):</strong> ระบบ inject single quote (<code>'</code>) เข้าไปในแต่ละ parameter แล้วส่ง request ไปยังเซิร์ฟเวอร์ จากนั้นตรวจสอบ response body ว่ามี SQL error message ปรากฏหรือไม่ เช่น ORA-, MySQL Error, Syntax Error หรือ SQLSTATE ซึ่งครอบคลุม MySQL, PostgreSQL, Oracle, MSSQL และ SQLite</li>
+      <li><strong>ขั้นที่ 3 — ผล Phase 1:</strong> หากพบ SQL error message ระบบสร้าง Critical finding ประเภท Error-Based พร้อม evidence ที่เป็น error message จริงจากเซิร์ฟเวอร์ จากนั้นดำเนินการต่อด้วย Phase 2 เพื่อหาช่องโหว่เพิ่มเติม</li>
+      <li><strong>ขั้นที่ 4 — Phase 2 (Boolean-Based):</strong> ระบบ inject TRUE condition (เช่น 1=1) แล้วบันทึก response A จากนั้น inject FALSE condition (เช่น 1=2) แล้วบันทึก response B เปรียบเทียบความแตกต่างของทั้งสอง response</li>
+      <li><strong>ขั้นที่ 5 — ผล Phase 2:</strong> หาก response A และ B แตกต่างกันอย่างมีนัยสำคัญ (เช่น ขนาด content ต่างกันเกิน threshold) แสดงว่า SQL query ถูกควบคุมได้ ระบบสร้าง Critical finding ประเภท Boolean-Based</li>
+      <li><strong>ขั้นที่ 6 — Phase 3 ตรวจสอบ Mode:</strong> Phase 3 จะทำงานเฉพาะเมื่อ Scan Mode เป็น Full Scan เท่านั้น เนื่องจากการ inject time-delay อาจทำให้การ scan ช้ามากหากทำกับทุก URL ใน Normal/Timed mode</li>
+      <li><strong>ขั้นที่ 7 — Phase 3 (Time-Based):</strong> ระบบ inject time-delay payload เช่น SLEEP(5) สำหรับ MySQL หรือ WAITFOR DELAY สำหรับ MSSQL แล้วส่ง request พร้อมวัดเวลาที่ใช้ในการได้รับ response</li>
+      <li><strong>ขั้นที่ 8 — ผล Phase 3:</strong> หาก response ใช้เวลามากกว่า 4.5 วินาที (หรือค่า threshold ที่กำหนด) แสดงว่าเซิร์ฟเวอร์รัน SQL delay function สำเร็จ ระบบสร้าง Critical finding ประเภท Time-Based ซึ่งตรวจจับได้แม้ response body ไม่มีความแตกต่าง</li>
+      <li><strong>ขั้นที่ 9 — คืนค่า Findings:</strong> รวม findings จากทุก phase ที่พบแล้วคืนค่ากลับไปยัง Engine</li>
+    </ol>
+  </div>
+
+  <div class="desc-box">
+    <div class="label">รายละเอียดแต่ละ Phase</div>
+    <ul>
+      <li><strong>Phase 1 (Error-based):</strong> เร็วที่สุด ตรวจจับจาก SQL error message ที่ server ส่งกลับมา ครอบคลุม MySQL, PostgreSQL, Oracle, MSSQL, SQLite error patterns</li>
+      <li><strong>Phase 2 (Boolean-based):</strong> ตรวจจับโดยเปรียบเทียบ response ของ true/false condition หาก response ต่างกันแสดงว่า SQL query ถูก inject สำเร็จ</li>
+      <li><strong>Phase 3 (Time-based):</strong> ทำเฉพาะ FullScan mode เท่านั้น ใช้ <code>SLEEP()</code> หรือ <code>WAITFOR DELAY</code> เพื่อทำให้ server ตอบช้าโดยตั้งใจ ตรวจจับได้แม้ response body ไม่เปลี่ยน</li>
+    </ul>
+  </div>
+
+  <hr class="sec-div">
+
+  <!-- FC-05 -->
+  <h3 class="sub">FC-05: การคำนวณ Dynamic Risk Score (OWASP-Inspired Formula)</h3>
+
+  <div class="diagram-wrap">
+    <div class="mermaid">
+flowchart TD
+  A([เริ่มต้น calcRiskScores]) --> B["รับ []findings และ totalURLs"]
+  B --> C{totalURLs = 0\nหรือ findings ว่าง?}
+  C -->|Yes| Z1([คืน findings เดิม])
+  C -->|No| D
+
+  D["Group findings by Title\nสร้าง map: title → {occurrences, urlsAffected}"] --> E
+
+  subgraph GROUP["วนสำหรับแต่ละ Finding"]
+    E["นับ occurrences++"] --> F["เพิ่ม TargetURL ลง urlsAffected set"]
+    F -->|ยัง| E
+  end
+
+  GROUP --> G
+
+  subgraph SCORE["คำนวณ RiskScore สำหรับแต่ละ title ที่ไม่ซ้ำ"]
+    G["IncidenceRate% =\nlen(urlsAffected) / totalURLs × 100"] --> H
+    H["OccurrenceRatio =\noccurrences / totalURLs"] --> I
+    I["ดึง ExploitScore + ImpactScore\nจาก finding ตัวแรกของ title\n(ค่าเดียวกันทั้ง title เพราะมาจาก severity)"] --> J
+    J["RiskScore =\n(IncidenceRate% × 0.30)\n+ (ExploitScore × 10.0)\n+ (ImpactScore × 20.0)\n+ (OccurrenceRatio × 10.0)"] --> K
+    K["Round to 2 decimal places\nด้วย float(int(risk×100+0.5))/100"]
+  end
+
+  K --> L["เก็บ scoreByTitle[title] = riskScore"]
+  L --> M["วนคืน RiskScore ให้ findings ทุกตัว\nที่มี Title เดียวกัน"]
+  M --> Z2([คืน findings พร้อม RiskScore])
+
+  subgraph EXAMPLE["ตัวอย่างการคำนวณ: Missing HSTS (High)"]
+    EX1["URLsAffected = 10/10 → 100%\nOccurrences = 10 → ratio = 1.0\nExploit = 7.5, Impact = 8.0"]
+    EX2["RiskScore =\n(100 × 0.30) + (7.5 × 10) + (8.0 × 20) + (1.0 × 10)\n= 30 + 75 + 160 + 10 = 275.00"]
+    EX1 --> EX2
+  end
+
+  style A fill:#1a7a4a,color:#fff,stroke:#1a7a4a
+  style Z1 fill:#4a5568,color:#fff,stroke:#4a5568
+  style Z2 fill:#0d6efd,color:#fff,stroke:#0d6efd
+  style GROUP fill:#f4f7fb,stroke:#4a5568
+  style SCORE fill:#e8f0fe,stroke:#0d6efd
+  style EXAMPLE fill:#fef3e2,stroke:#d68910
+    </div>
+  </div>
+  <div class="caption">รูปที่ ค-11: Flowchart แสดงอัลกอริทึมการคำนวณ Dynamic Risk Score ด้วย OWASP-Inspired Formula</div>
+
+  <div class="desc-box">
+    <div class="label">อธิบายการทำงาน Step by Step</div>
+    <ol>
+      <li><strong>ขั้นที่ 1 — ตรวจสอบข้อมูลเบื้องต้น:</strong> ฟังก์ชัน <code>calcRiskScores()</code> รับ findings ทั้งหมดที่ผ่านการ deduplication แล้ว พร้อม totalURLs ที่ crawl ได้ หาก totalURLs เป็น 0 หรือไม่มี findings ให้คืนค่าเดิมโดยไม่คำนวณ</li>
+      <li><strong>ขั้นที่ 2 — จัดกลุ่ม Findings ตาม Title:</strong> ระบบวน loop ผ่าน findings ทั้งหมดเพื่อสร้าง map โดยใช้ Title เป็น key เก็บข้อมูล 2 อย่างสำหรับแต่ละ title คือ (1) จำนวนครั้งทั้งหมดที่พบ (occurrences) และ (2) set ของ URL ที่ถูกผลกระทบ (urlsAffected)</li>
+      <li><strong>ขั้นที่ 3 — คำนวณ IncidenceRate%:</strong> สำหรับแต่ละ title ระบบคำนวณอัตราการพบช่องโหว่โดยหาร จำนวน URL ที่ถูกผลกระทบ ด้วย totalURLs แล้วคูณ 100 เพื่อแปลงเป็นเปอร์เซ็นต์ เช่น พบใน 3 จาก 10 URL = 30%</li>
+      <li><strong>ขั้นที่ 4 — คำนวณ OccurrenceRatio:</strong> ระบบหาร occurrences ทั้งหมดด้วย totalURLs เพื่อได้อัตราส่วนการปรากฏซ้ำ ซึ่งแยกจาก IncidenceRate เพื่อจับกรณีที่ช่องโหว่เดียวปรากฏหลายครั้งในหน้าเดียวกัน</li>
+      <li><strong>ขั้นที่ 5 — ดึง ExploitScore และ ImpactScore:</strong> ระบบดึง ExploitScore และ ImpactScore จาก finding ตัวแรกของแต่ละ title เนื่องจาก findings ที่มี title เดียวกันจะมีค่าเหมือนกันเสมอ (กำหนดตาม severity tier)</li>
+      <li><strong>ขั้นที่ 6 — คำนวณ RiskScore:</strong> ระบบคำนวณ RiskScore ด้วยสูตร<br>
+        <code>(IncidenceRate% × 0.30) + (ExploitScore × 10.0) + (ImpactScore × 20.0) + (OccurrenceRatio × 10.0)</code><br>
+        โดย ImpactScore ได้รับน้ำหนักสูงสุด (×20) สะท้อน OWASP methodology ที่เน้นผลกระทบมากกว่าความง่ายในการโจมตี</li>
+      <li><strong>ขั้นที่ 7 — ปัดทศนิยม:</strong> ปัดค่า RiskScore ให้เหลือ 2 ตำแหน่งทศนิยมด้วย banker's rounding เพื่อความสม่ำเสมอในการแสดงผล</li>
+      <li><strong>ขั้นที่ 8 — กำหนดคะแนนกลับ:</strong> ระบบวน loop ผ่าน findings ทั้งหมดอีกครั้งและกำหนด RiskScore จาก <code>scoreByTitle[f.Title]</code> ให้กับ findings ทุกตัวที่มี title เดียวกัน ทำให้ findings กลุ่มเดียวกันได้คะแนนเท่ากันเสมอ</li>
+      <li><strong>ขั้นที่ 9 — คืนค่า:</strong> คืน findings ทั้งหมดพร้อม RiskScore ที่คำนวณแล้ว กลับไปยัง Engine เพื่อใช้ในการเรียงลำดับและสร้างรายงานต่อไป</li>
+    </ol>
+  </div>
+
+  <div class="desc-box">
+    <div class="label">เหตุผลของ weight ในสูตร</div>
+    <ul>
+      <li><strong>ImpactScore × 20</strong> — ให้น้ำหนักมากที่สุด สะท้อน OWASP methodology ที่ถือว่า "ผลกระทบ" สำคัญกว่า "ความง่ายในการโจมตี"</li>
+      <li><strong>ExploitScore × 10</strong> — น้ำหนักปานกลาง แทน exploitability sub-score ของ CVSSv3</li>
+      <li><strong>IncidenceRate% × 0.30</strong> — น้ำหนักน้อยที่สุด แทน "กี่เปอร์เซ็นต์ของ URL ที่ได้รับผลกระทบ" ใน scan นี้ (ปรับจาก OWASP population-level metric)</li>
+      <li><strong>OccurrenceRatio × 10</strong> — คำนวณจากจำนวนครั้งที่พบหาร totalURLs แยกจาก IncidenceRate เพื่อจับ findings ที่ปรากฏซ้ำหลายครั้งในหน้าเดียวกัน</li>
+      <li><strong>Scale สูงสุด ≈ 340</strong> — Critical ที่ 100% incidence ได้คะแนน 326, High=275, Medium=220, Low=150 ทำให้ severity เป็นตัวกำหนดหลักเสมอ</li>
+    </ul>
+  </div>
+
+  <table class="info-table">
+    <thead><tr><th>Severity</th><th>Exploit</th><th>Impact</th><th>RiskScore (Incidence 100%)</th><th>RiskScore (Incidence 10%)</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge badge-c">Critical</span></td><td>9.0</td><td>9.8</td><td><strong>326.00</strong></td><td>289.00</td></tr>
+      <tr><td><span class="badge badge-h">High</span></td><td>7.5</td><td>8.0</td><td><strong>275.00</strong></td><td>238.00</td></tr>
+      <tr><td><span class="badge badge-m">Medium</span></td><td>5.0</td><td>6.5</td><td><strong>220.00</strong></td><td>183.00</td></tr>
+      <tr><td><span class="badge badge-l">Low</span></td><td>3.0</td><td>4.0</td><td><strong>150.00</strong></td><td>113.00</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>หมายเหตุ:</strong> แม้ High ที่ Incidence 100% ได้ 275 คะแนน แต่ Critical ที่ Incidence 1% ยังคงได้ ≈ 286 คะแนน
+    ทำให้ Critical มักอยู่สูงกว่า High เสมอ แม้พบน้อยครั้งกว่า — ซึ่งสะท้อนความเป็นจริงด้านความรุนแรง
+  </div>
+
+  <hr class="sec-div">
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- FOOTER                                        -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <div class="doc-footer">
+    <span>Project Horizon — VA Scanner &nbsp;|&nbsp; ภาคผนวก ค: การออกแบบระบบ</span>
+    <span>ภูมินทร์ ทองลา &nbsp;|&nbsp; ปีการศึกษา 2568</span>
+  </div>
+
+</div><!-- end .page -->
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    flowchart: { curve: 'basis', padding: 20 },
+    sequence: { diagramMarginX: 30, diagramMarginY: 20, actorMargin: 80, width: 180, height: 50, boxMargin: 10, noteMargin: 14, messageMargin: 50 },
+    themeVariables: {
+      primaryColor:       '#1a3a5c',
+      primaryTextColor:   '#ffffff',
+      primaryBorderColor: '#0d6efd',
+      lineColor:          '#4a5568',
+      secondaryColor:     '#f4f7fb',
+      tertiaryColor:      '#e8f0fe',
+      fontSize:           '14px'
+    }
+  });
+</script>
+</body>
+</html>

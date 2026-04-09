@@ -331,11 +331,19 @@ func (e *ScannerEngine) Run(ctx context.Context) model.ScanResponse {
 
 	setProgress("reporting", len(urls), len(urls))
 
+	// Step 4a — Compute dynamic RiskScore per finding (OWASP-inspired formula).
+	// Must run after deduplication so occurrence counts and incidence rates are final.
+	findings = calcRiskScores(findings, len(urls))
+
+	// Step 4b — Sort by RiskScore descending; break ties by CVSSScore, then Type.
 	sort.Slice(findings, func(i, j int) bool {
-		if findings[i].CVSSScore == findings[j].CVSSScore {
-			return findings[i].Type < findings[j].Type
+		if findings[i].RiskScore != findings[j].RiskScore {
+			return findings[i].RiskScore > findings[j].RiskScore
 		}
-		return findings[i].CVSSScore > findings[j].CVSSScore
+		if findings[i].CVSSScore != findings[j].CVSSScore {
+			return findings[i].CVSSScore > findings[j].CVSSScore
+		}
+		return findings[i].Type < findings[j].Type
 	})
 
 	stats := calculateStats(len(urls), findings)
@@ -724,6 +732,67 @@ func detectLoginSuccess(jar http.CookieJar, loginURL, finalURL string, body []by
 		}
 	}
 	return false
+}
+
+// calcRiskScores computes a dynamic RiskScore for every finding using an
+// OWASP-inspired formula adapted for single-target scans.
+//
+// Formula (max 340 pts):
+//
+//	RiskScore = (IncidenceRate% × 0.30)   // % of scanned URLs affected
+//	          + (ExploitScore  × 10.0)    // how easy to exploit (0-10)
+//	          + (ImpactScore   × 20.0)    // technical damage (0-10), weight ×2 like OWASP
+//	          + (OccurrenceRatio × 10.0)  // volume tiebreaker (occurrences / totalURLs)
+//
+// All findings of the same Title share the same RiskScore so that the sort
+// order groups them consistently.
+func calcRiskScores(findings []model.Finding, totalURLs int) []model.Finding {
+	if totalURLs == 0 || len(findings) == 0 {
+		return findings
+	}
+
+	// Count occurrences and unique URLs affected per finding title.
+	type titleStats struct {
+		occurrences  int
+		urlsAffected map[string]struct{}
+	}
+	byTitle := map[string]*titleStats{}
+	for _, f := range findings {
+		ts, ok := byTitle[f.Title]
+		if !ok {
+			ts = &titleStats{urlsAffected: map[string]struct{}{}}
+			byTitle[f.Title] = ts
+		}
+		ts.occurrences++
+		ts.urlsAffected[f.TargetURL] = struct{}{}
+	}
+
+	// Pre-compute RiskScore per title.
+	scoreByTitle := map[string]float64{}
+	for title, ts := range byTitle {
+		incidenceRate := float64(len(ts.urlsAffected)) / float64(totalURLs) * 100.0
+		occRatio := float64(ts.occurrences) / float64(totalURLs)
+
+		// Use Exploit/Impact from the first finding with this title (all share same severity).
+		var exploit, impact float64
+		for _, f := range findings {
+			if f.Title == title {
+				exploit = f.ExploitScore
+				impact = f.ImpactScore
+				break
+			}
+		}
+
+		risk := (incidenceRate * 0.30) + (exploit * 10.0) + (impact * 20.0) + (occRatio * 10.0)
+		// Round to 2 decimal places.
+		scoreByTitle[title] = float64(int(risk*100+0.5)) / 100.0
+	}
+
+	// Assign computed RiskScore back to each finding.
+	for i := range findings {
+		findings[i].RiskScore = scoreByTitle[findings[i].Title]
+	}
+	return findings
 }
 
 // calculateStats counts findings by severity and packages them with the

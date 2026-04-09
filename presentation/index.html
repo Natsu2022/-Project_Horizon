@@ -583,7 +583,7 @@
       <span class="cover-tag">OWASP Top 10:2025</span>
       <span class="cover-tag">Go Backend</span>
       <span class="cover-tag">PyQt6 GUI</span>
-      <span class="cover-tag">8 Scanner Modules</span>
+      <span class="cover-tag">9 Scanner Modules</span>
       <span class="cover-tag">กสทช. 1.3</span>
     </div>
 
@@ -1106,10 +1106,79 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════ -->
-<!-- SLIDE 14 — Live Demo Data                     -->
+<!-- SLIDE 14 — Risk Scoring                       -->
+<!-- ═══════════════════════════════════════════════ -->
+<section id="s-risk">
+  <span class="slide-label">14 / Risk Scoring</span>
+  <h2>Risk Scoring — OWASP-Inspired Formula</h2>
+  <div class="divider"></div>
+
+  <div class="two-col" style="gap:28px; align-items:start; margin-top:8px;">
+    <!-- Left: formula explanation -->
+    <div>
+      <p style="font-size:0.45em; color:var(--text-dim); margin-bottom:8px;">สูตรคำนวณ RiskScore (per finding type):</p>
+      <div style="background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:14px 18px; font-family:monospace; font-size:0.38em; line-height:2.2; text-align:left;">
+        <div><span style="color:var(--cyan);">RiskScore</span> =</div>
+        <div style="padding-left:1.5em;">( IncidenceRate% &times; <span style="color:#f5c842;">0.30</span> )</div>
+        <div style="padding-left:1.5em;">+ ( ExploitScore &times; <span style="color:#f5c842;">10.0</span> )</div>
+        <div style="padding-left:1.5em;">+ ( ImpactScore &times; <span style="color:#f5c842;">20.0</span> )</div>
+        <div style="padding-left:1.5em;">+ ( OccurrenceRatio &times; <span style="color:#f5c842;">10.0</span> )</div>
+      </div>
+      <div class="fragment" style="margin-top:12px; font-size:0.38em; color:var(--text-dim); line-height:1.8; text-align:left;">
+        <div><strong style="color:var(--text);">IncidenceRate%</strong> — สัดส่วน URL ที่มีช่องโหว่นี้ (เทียบกับ URL ทั้งหมด)</div>
+        <div><strong style="color:var(--text);">ExploitScore</strong> — ความง่ายในการโจมตี (CVSS exploitability, 0–10)</div>
+        <div><strong style="color:var(--text);">ImpactScore</strong> — ความรุนแรงของผลกระทบ (CVSS impact, 0–10)</div>
+        <div><strong style="color:var(--text);">OccurrenceRatio</strong> — จำนวนครั้งที่พบ / URL ทั้งหมด</div>
+      </div>
+      <div class="fragment" style="margin-top:10px; font-size:0.36em; color:var(--text-dim); text-align:left;">
+        Impact weighted &times;20 vs Exploit &times;10 — สะท้อน OWASP methodology ที่ให้ความสำคัญกับผลกระทบมากกว่าความง่าย
+      </div>
+    </div>
+
+    <!-- Right: score table + example -->
+    <div>
+      <p style="font-size:0.45em; color:var(--text-dim); margin-bottom:8px;">ค่าคะแนนตาม Severity (ที่ Incidence 100%):</p>
+      <table class="findings-table fragment" style="font-size:0.38em; width:100%;">
+        <thead>
+          <tr><th>Severity</th><th>Exploit</th><th>Impact</th><th>Max Score</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge badge-critical">Critical</span></td>
+            <td>9.0</td><td>9.8</td>
+            <td><strong style="color:var(--danger);">326</strong></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-high">High</span></td>
+            <td>7.5</td><td>8.0</td>
+            <td><strong style="color:var(--warn);">275</strong></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-medium">Medium</span></td>
+            <td>5.0</td><td>6.5</td>
+            <td><strong style="color:#64b0ff;">220</strong></td>
+          </tr>
+          <tr>
+            <td><span class="badge badge-low">Low</span></td>
+            <td>3.0</td><td>4.0</td>
+            <td><strong style="color:var(--ok);">150</strong></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="fragment" style="margin-top:14px; background:var(--bg3); border:1px solid rgba(100,176,255,0.3); border-radius:8px; padding:10px 14px; font-size:0.36em; font-family:monospace; text-align:left; line-height:2.0;">
+        <div style="color:var(--text-dim);">ตัวอย่าง: Missing HSTS (High) พบ 10/10 URL</div>
+        <div>( 100% &times; 0.30 ) + ( 7.5 &times; 10 ) + ( 8.0 &times; 20 ) + ( 1.0 &times; 10 )</div>
+        <div>= 30 + 75 + 160 + 10 = <span style="color:var(--warn);">275.00</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SLIDE 15 — Live Demo Data                     -->
 <!-- ═══════════════════════════════════════════════ -->
 <section id="s-demo">
-  <span class="slide-label">14 / Demo Results</span>
+  <span class="slide-label">15 / Demo Results</span>
   <h2>ผลการสแกนจริง — zaproxy.org</h2>
   <div class="divider"></div>
 
@@ -1187,10 +1256,10 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════ -->
-<!-- SLIDE 15 — Reports                            -->
+<!-- SLIDE 16 — Reports                            -->
 <!-- ═══════════════════════════════════════════════ -->
 <section>
-  <span class="slide-label">15 / Reports</span>
+  <span class="slide-label">16 / Reports</span>
   <h2>Report Generation</h2>
   <div class="divider"></div>
 
@@ -1218,10 +1287,10 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════ -->
-<!-- SLIDE 16 — Limitations                        -->
+<!-- SLIDE 17 — Limitations                        -->
 <!-- ═══════════════════════════════════════════════ -->
 <section>
-  <span class="slide-label">16 / Limitations</span>
+  <span class="slide-label">17 / Limitations</span>
   <h2>Limitations &amp; Future Work</h2>
   <div class="divider"></div>
 
@@ -1256,10 +1325,10 @@
 </section>
 
 <!-- ═══════════════════════════════════════════════ -->
-<!-- SLIDE 17 — Summary                            -->
+<!-- SLIDE 18 — Summary                            -->
 <!-- ═══════════════════════════════════════════════ -->
 <section>
-  <span class="slide-label">17 / Summary</span>
+  <span class="slide-label">18 / Summary</span>
   <h2>สรุป</h2>
   <div class="divider"></div>
 
@@ -1276,11 +1345,12 @@
     <li>สนับสนุนการปฏิบัติตาม <strong>ประมวลแนวปฏิบัติ กสทช. 2565</strong> หมวด 1.3</li>
     <li>มีฟีเจอร์ <strong>Authentication + Brute Force</strong> พร้อม 3-signal detection</li>
     <li>รองรับ <strong>OWASP ZAP Integration</strong> สำหรับ Active Scan ขั้นสูง</li>
+    <li>คำนวณ <strong>Dynamic Risk Score</strong> ด้วยสูตร OWASP-Inspired (Exploit × Impact × Incidence)</li>
   </ul>
 </section>
 
 <!-- ═══════════════════════════════════════════════ -->
-<!-- SLIDE 18 — Q&A                                -->
+<!-- SLIDE 19 — Q&A                                -->
 <!-- ═══════════════════════════════════════════════ -->
 <section id="s-qa">
   <div class="qa-box">

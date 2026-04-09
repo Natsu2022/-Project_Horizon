@@ -95,6 +95,12 @@ type ScanRequest struct {
 // Finding represents a single security vulnerability discovered by a plugin.
 // Every plugin produces zero or more Findings per scanned URL.
 // The engine deduplicates by (Type|TargetURL|Evidence) before returning results.
+//
+// Risk scoring fields (computed by engine after full scan):
+//   ExploitScore  — CVSS-based exploitability sub-score (0–10), set at creation.
+//   ImpactScore   — CVSS-based technical impact sub-score (0–10), set at creation.
+//   RiskScore     — Dynamic score computed after scanning using incidence rate,
+//                   exploit, impact, and occurrence volume (0–340 scale).
 type Finding struct {
 	ID             string   `json:"id"`
 	Type           string   `json:"type"`
@@ -103,6 +109,9 @@ type Finding struct {
 	Description    string   `json:"description"`
 	Severity       string   `json:"severity"`
 	CVSSScore      float64  `json:"cvss_score"`
+	ExploitScore   float64  `json:"exploit_score"`
+	ImpactScore    float64  `json:"impact_score"`
+	RiskScore      float64  `json:"risk_score"`
 	OWASPCategory  string   `json:"owasp_category"`
 	CWEIDs         []string `json:"cwe_ids,omitempty"`
 	TargetURL      string   `json:"target_url"`
@@ -173,6 +182,8 @@ func NewFinding(module, findingType, title, description, severity, owasp, target
 		Description:    description,
 		Severity:       severity,
 		CVSSScore:      ScoreBySeverity(severity),
+		ExploitScore:   ExploitBySeverity(severity),
+		ImpactScore:    ImpactBySeverity(severity),
 		OWASPCategory:  owasp,
 		TargetURL:      targetURL,
 		Evidence:       evidence,
@@ -182,6 +193,7 @@ func NewFinding(module, findingType, title, description, severity, owasp, target
 	}
 }
 
+// ScoreBySeverity maps a severity label to a representative CVSS base score.
 func ScoreBySeverity(sev string) float64 {
 	switch sev {
 	case "Critical":
@@ -192,6 +204,42 @@ func ScoreBySeverity(sev string) float64 {
 		return 6.1
 	case "Low":
 		return 3.7
+	default:
+		return 0.0
+	}
+}
+
+// ExploitBySeverity returns the CVSS Exploitability sub-score (0–10)
+// representing how easily the vulnerability can be triggered remotely.
+// Values are representative estimates aligned with CVSSv3 exploitability ranges.
+func ExploitBySeverity(sev string) float64 {
+	switch sev {
+	case "Critical":
+		return 9.0 // network-accessible, no auth, no interaction
+	case "High":
+		return 7.5 // network-accessible, low complexity
+	case "Medium":
+		return 5.0 // some prerequisites required
+	case "Low":
+		return 3.0 // local/limited exploitability
+	default:
+		return 0.0
+	}
+}
+
+// ImpactBySeverity returns the CVSS Technical Impact sub-score (0–10)
+// representing the consequence to confidentiality, integrity, and availability.
+// Values are representative estimates aligned with CVSSv3 impact ranges.
+func ImpactBySeverity(sev string) float64 {
+	switch sev {
+	case "Critical":
+		return 9.8 // full C/I/A compromise
+	case "High":
+		return 8.0 // significant data/system impact
+	case "Medium":
+		return 6.5 // partial impact on one or more dimensions
+	case "Low":
+		return 4.0 // minimal or indirect impact
 	default:
 		return 0.0
 	}

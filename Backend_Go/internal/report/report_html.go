@@ -17,6 +17,7 @@ type htmlFinding struct {
 	Severity       string
 	SevClass       string
 	CVSSScore      string
+	RiskScore      string
 	OWASPCategory  string
 	CWEIDs         string
 	TargetURL      string
@@ -75,6 +76,7 @@ func buildHTMLData(payload reportPayload) htmlReportData {
 			Severity:       f.Severity,
 			SevClass:       strings.ToLower(f.Severity),
 			CVSSScore:      fmt.Sprintf("%.1f", f.CVSSScore),
+			RiskScore:      fmt.Sprintf("%.2f", f.RiskScore),
 			OWASPCategory:  f.OWASPCategory,
 			CWEIDs:         strings.Join(f.CWEIDs, ", "),
 			TargetURL:      f.TargetURL,
@@ -191,6 +193,8 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
 .refs-box{color:#58a6ff;font-size:12px;word-break:break-all}
 /* ── CVSS pill ──────────────────────────────────────── */
 .cvss-pill{background:#21262d;border:1px solid #30363d;border-radius:4px;font-size:11px;font-weight:700;padding:1px 7px;color:#e6edf3}
+/* ── Risk Score pill ────────────────────────────────── */
+.risk-pill{background:#1a1a2e;border:1px solid #6e40c9;border-radius:4px;font-size:11px;font-weight:700;padding:1px 7px;color:#c084fc}
 /* ── Narrative sections ─────────────────────────────── */
 .narrative-box{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:16px 20px;color:#e6edf3;font-size:14px;line-height:1.7;margin-bottom:24px;white-space:pre-wrap}
 .narrative-box.methodology{border-left:3px solid #388bfd}
@@ -295,6 +299,7 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
           <th>Title</th>
           <th>Severity</th>
           <th>CVSS</th>
+          <th title="Risk Score = Incidence% × 0.3 + Exploit × 10 + Impact × 20 + Volume × 10 (max 340)">Risk Score</th>
           <th>CWE</th>
           <th>URL</th>
           <th style="text-align:center">Detail</th>
@@ -307,6 +312,7 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
           <td>{{.Title}}</td>
           <td><span class="badge {{.SevClass}}">{{.Severity}}</span></td>
           <td><span class="cvss-pill">{{.CVSSScore}}</span></td>
+          <td><span class="risk-pill" title="Risk Score (max 340)">{{.RiskScore}}</span></td>
           <td style="font-size:11px;color:#8b949e;font-family:monospace">{{if .CWEIDs}}{{.CWEIDs}}{{else}}&mdash;{{end}}</td>
           <td class="url-cell" title="{{.TargetURL}}">{{.TargetURL}}</td>
           <td style="text-align:center;white-space:nowrap">
@@ -315,7 +321,7 @@ a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}
         </tr>
         <!-- Inline detail expand row (hidden by default, toggled by Detail button) -->
         <tr class="detail-exp-row">
-          <td colspan="7">
+          <td colspan="8">
             <div class="detail-exp-cell">
               <div class="detail-grid">
                 <div class="detail-row">
